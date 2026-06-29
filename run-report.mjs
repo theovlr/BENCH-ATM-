@@ -266,7 +266,14 @@ Règles IMPORTANTES :
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const text = message.content[0].text.trim();
+  let text = message.content[0].text.trim();
+  // Strip markdown code fences if Claude wrapped the JSON
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  // If there's still no valid start, extract the first {...} block
+  if (!text.startsWith('{')) {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) text = match[0];
+  }
   return JSON.parse(text);
 }
 
