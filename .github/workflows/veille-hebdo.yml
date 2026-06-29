@@ -1,1 +1,54 @@
-https://claude.ai/api/organizations/f1a18d10-e125-464d-a21c-06f02ad603ba/files/d9d812a2-27a0-464c-9291-45d3f1d4609c/contents
+name: Veille Concurrence Hebdomadaire
+
+on:
+  schedule:
+    - cron: '7 7 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configurer Git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Générer le rapport veille
+        run: node run-report.mjs
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FOREPLAY_API_KEY: ${{ secrets.FOREPLAY_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Publier sur GitHub Pages
+        run: |
+          git add docs/
+          git diff --staged --quiet || git commit -m "Rapport veille concurrence $(date +%Y-%m-%d)"
+          git push origin ${{ github.ref_name }}
+
+      - name: Sauvegarder le rapport comme artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rapport-veille-${{ github.run_number }}
+          path: docs/rapport-veille-*.html
+          retention-days: 30
