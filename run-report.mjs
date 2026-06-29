@@ -68,14 +68,15 @@ async function foreplayGet(path, params = {}) {
 
 async function getSpyderBrands() {
   const pages = await Promise.all([
-    foreplayGet('/spyder/brands', { page: 1, pageSize: 25 }),
-    foreplayGet('/spyder/brands', { page: 2, pageSize: 25 })
+    foreplayGet('/api/spyder/brands', { limit: 10, offset: 0 }),
+    foreplayGet('/api/spyder/brands', { limit: 10, offset: 10 }),
+    foreplayGet('/api/spyder/brands', { limit: 10, offset: 20 }),
   ]);
   return pages.flatMap(p => p.brands || p.data || p || []);
 }
 
 async function getBrandAds(brandId) {
-  const resp = await foreplayGet(`/spyder/brands/${brandId}/ads`, { page: 1, pageSize: 20 });
+  const resp = await foreplayGet('/api/spyder/brand/ads', { brand_id: brandId, limit: 20, order: 'newest' });
   return (resp.ads || resp.data || resp || []).map(ad => ({
     id: ad.id,
     format: ad.format || ad.ad_type || ad.type || 'Inconnu',
