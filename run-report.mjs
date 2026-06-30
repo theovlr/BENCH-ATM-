@@ -231,6 +231,29 @@ async function analyzeWithClaude(data) {
   const fmt = d => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   const weekLabel = `${fmt(weekStart)} – ${fmt(today)} ${today.getFullYear()}`;
 
+  // Trim data to stay within token limits — keep only analysis-relevant fields
+  const trimmedCompetitors = data.competitors.map(b => ({
+    brand: b.brand,
+    ads: b.ads.slice(0, 10).map(ad => ({
+      id: ad.id,
+      format: ad.format,
+      days_active: ad.days_active,
+      start_date: ad.start_date,
+      hook_text: (ad.hook_text || '').substring(0, 180),
+      url: ad.url,
+    }))
+  }));
+  const trimmedOwn = data.ownBrands.map(b => ({
+    brand: b.brand,
+    ads: b.ads.slice(0, 15).map(ad => ({
+      id: ad.id,
+      format: ad.format,
+      days_active: ad.days_active,
+      hook_text: (ad.hook_text || '').substring(0, 180),
+      url: ad.url,
+    }))
+  }));
+
   const totalAds = data.competitors.reduce((n, b) => n + b.ads.length, 0);
   const totalOwn = data.ownBrands.reduce((n, b) => n + b.ads.length, 0);
   console.log(`🤖 Envoi de ${totalAds} pubs concurrentes + ${totalOwn} pubs ATM à Claude...`);
@@ -240,10 +263,10 @@ async function analyzeWithClaude(data) {
 Voici les pubs concurrentes — INDUSTRIE JEUX DE SOCIÉTÉ / ENTERTAINMENT uniquement — semaine du ${weekLabel} :
 
 CONCURRENTS PAR PAYS (déjà pré-classifiés) :
-${JSON.stringify(data.competitors, null, 2)}
+${JSON.stringify(trimmedCompetitors, null, 2)}
 
 MARQUES ATM GAMING (pour la section "Mes Perfs") :
-${JSON.stringify(data.ownBrands, null, 2)}
+${JSON.stringify(trimmedOwn, null, 2)}
 
 DONNÉES META ADS ATM GAMING (semaine en cours) :
 ${data.meta ? JSON.stringify(data.meta, null, 2) : 'Non disponible (META_ACCESS_TOKEN non configuré)'}
@@ -478,8 +501,11 @@ Règles IMPORTANTES :
   });
 
   // Extract structured output from tool use (guaranteed valid JSON)
+  if (message.stop_reason === 'max_tokens') {
+    throw new Error('Claude a atteint la limite de tokens (max_tokens). Réduire les données envoyées.');
+  }
   const toolUse = message.content.find(b => b.type === 'tool_use');
-  if (toolUse) return toolUse.input;
+  if (toolUse && toolUse.input && toolUse.input.countries) return toolUse.input;
 
   // Fallback: parse text response
   let text = (message.content[0]?.text || '').trim();
@@ -1064,7 +1090,10 @@ async function main() {
   if (data.competitors.length === 0) throw new Error('Aucune donnée concurrente récupérée. Vérifie ta clé API Foreplay.');
 
   const analysis = await analyzeWithClaude(data);
-  const totalPays = Object.values(analysis.countries || {}).filter(Boolean).reduce((n, c) => n + (c.adsCount||0), 0);
+  if (!analysis || !analysis.countries || typeof analysis.countries !== 'object') {
+    throw new Error(`Réponse Claude invalide — countries manquant. Reçu: ${JSON.stringify(analysis)?.substring(0, 300)}`);
+  }
+  const totalPays = Object.values(analysis.countries).filter(Boolean).reduce((n, c) => n + (c.adsCount||0), 0);
   console.log(`  → Analyse OK : ${totalPays} pubs · ${analysis.activeBrands} marques · ${Object.keys(analysis.countries).length} pays`);
 
   const today = new Date().toISOString().split('T')[0];
