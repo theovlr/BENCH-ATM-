@@ -24,15 +24,18 @@ const OWN_BRAND_KEYWORDS = ['quickstop', 'pili pili', 'speedbac', 'smash it', 'j
 
 // Marques hors industrie à ignorer dans l'analyse (dating, food, beauty...)
 const IRRELEVANT_KEYWORDS = ['meetic', 'tinder', 'paired', 'fruitz', 'air up', 'poppi',
-  'holy energy', 'naali', 'my lubie', 'melba', 'io sono te'];
+  'holy energy', 'naali', 'my lubie', 'melba'];
 
-// Classification pays par nom de marque
+// Classification pays par nom de marque (ordre important : plus spécifique en premier)
 const COUNTRY_RULES = [
-  { country: 'fr',     keywords: ['gigamic', 'bakakou', 'traitres', 'savana', 'olé mains', 'ole mains', 'cranio'] },
+  { country: 'it',     keywords: ['clementoni', 'cranio creations', 'ghenos', 'yaqua giochi', 'hilarus', 'sefirot', 'io sono te', 'fler world', 'yasgames'] },
+  { country: 'es',     keywords: ['devir', 'diset', 'gcatalan', 'maldito', 'gen x games', 'ediciones mas', 'sd games'] },
+  { country: 'nl',     keywords: ['999 games', 'jumbo games', 'white goblin', 'identity games', 'just games'] },
+  { country: 'fr',     keywords: ['gigamic', 'bakakou', 'traitres', 'savana', 'olé mains', 'ole mains', 'fabriquedejeux', 'dossiers criminels', 'emblemes', 'emblèmes'] },
   { country: 'dach',   keywords: ['yaqua', 'crack games', 'crack list', 'holy ', 'weplay'] },
   { country: 'uk',     keywords: ['big potato', 'bigpotato'] },
-  { country: 'us',     keywords: ['wdym', 'what do you meme', 'hitster', 'kollide', 'poppi'] },
-  { country: 'global', keywords: ['lego', 'mattel', 'uno', 'hasbro', 'asmodee', 'ravensburger', 'ghenos', 'naali', 'air up'] },
+  { country: 'us',     keywords: ['wdym', 'what do you meme', 'hitster', 'kollide', 'feastables'] },
+  { country: 'global', keywords: ['lego', 'mattel', 'uno', 'hasbro', 'asmodee', 'ravensburger', 'naali', 'axel arigato'] },
 ];
 
 function classifyCountry(brandName) {
@@ -305,7 +308,10 @@ Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans \`\`\`, sans texte
     "dach": { ... <même structure que fr> ... },
     "uk": { ... <même structure que fr> ... },
     "us": { ... <même structure que fr> ... },
-    "global": { ... <même structure que fr> ... }
+    "global": { ... <même structure que fr> ... },
+    "it": { ... <même structure que fr> ... },
+    "es": { ... <même structure que fr> ... },
+    "nl": { ... <même structure que fr> ... }
   },
   "atm": {
     "totalAds": <nombre>,
@@ -411,8 +417,8 @@ Règles IMPORTANTES :
           globalInsights: { type: 'array', items: { type: 'string' } },
           countries: {
             type: 'object',
-            properties: { fr: countrySchema, dach: countrySchema, uk: countrySchema, us: countrySchema, global: countrySchema },
-            required: ['fr', 'dach', 'uk', 'us', 'global']
+            properties: { fr: countrySchema, dach: countrySchema, uk: countrySchema, us: countrySchema, global: countrySchema, it: countrySchema, es: countrySchema, nl: countrySchema },
+            required: ['fr', 'dach', 'uk', 'us', 'global', 'it', 'es', 'nl']
           },
           atm: {
             type: 'object',
@@ -488,6 +494,9 @@ function generateHTML(a) {
     dach:   { flag: '🇩🇪', name: 'DACH',    accent: '#ef4444' },
     uk:     { flag: '🇬🇧', name: 'UK',      accent: '#f97316' },
     us:     { flag: '🇺🇸', name: 'US/EN',   accent: '#10b981' },
+    it:     { flag: '🇮🇹', name: 'Italie',  accent: '#f59e0b' },
+    es:     { flag: '🇪🇸', name: 'Espagne', accent: '#ec4899' },
+    nl:     { flag: '🇳🇱', name: 'Pays-Bas',accent: '#06b6d4' },
   };
 
   const totalByCountry = Object.entries(a.countries)
