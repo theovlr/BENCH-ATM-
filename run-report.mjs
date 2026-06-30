@@ -131,7 +131,11 @@ async function fetchMetaData() {
     return null;
   }
 
-  const accountId = META_AD_ACCOUNT_ID.startsWith('act_') ? META_AD_ACCOUNT_ID : `act_${META_AD_ACCOUNT_ID}`;
+  const accountIds = META_AD_ACCOUNT_ID.split(',').map(id => {
+    id = id.trim();
+    return id.startsWith('act_') ? id : `act_${id}`;
+  });
+
   const today = new Date();
   const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
   const since = weekAgo.toISOString().split('T')[0];
@@ -147,50 +151,59 @@ async function fetchMetaData() {
   };
 
   try {
-    console.log('📱 Récupération données Meta Ads...');
+    console.log(`📱 Récupération données Meta Ads (${accountIds.length} comptes)...`);
 
-    const [insightsResp, campaignsResp] = await Promise.all([
-      metaGet(`/${accountId}/insights`, {
-        fields: 'spend,impressions,clicks,actions,cost_per_action_type,purchase_roas,action_values',
-        time_range: JSON.stringify({ since, until }),
-        level: 'account'
-      }),
-      metaGet(`/${accountId}/campaigns`, {
-        fields: `name,status,insights.time_range({"since":"${since}","until":"${until}"}){spend,impressions,clicks,actions,purchase_roas}`,
-        limit: 20
-      })
-    ]);
+    const allResults = await Promise.all(accountIds.map(async accountId => {
+      const [insightsResp, campaignsResp] = await Promise.all([
+        metaGet(`/${accountId}/insights`, {
+          fields: 'spend,impressions,clicks,actions,purchase_roas',
+          time_range: JSON.stringify({ since, until }),
+          level: 'account'
+        }),
+        metaGet(`/${accountId}/campaigns`, {
+          fields: `name,status,insights.time_range({"since":"${since}","until":"${until}"}){spend,impressions,clicks,actions,purchase_roas}`,
+          limit: 20
+        })
+      ]);
+      return { accountId, insightsResp, campaignsResp };
+    }));
 
-    const ins = insightsResp.data?.[0] || {};
-    const totalSpend   = parseFloat(ins.spend || 0);
-    const impressions  = parseInt(ins.impressions || 0);
-    const clicks       = parseInt(ins.clicks || 0);
-    const purchases    = parseInt(ins.actions?.find(a => a.action_type === 'purchase')?.value || 0);
-    const roas         = parseFloat(ins.purchase_roas?.[0]?.value || 0);
-    const cpa          = purchases > 0 ? parseFloat((totalSpend / purchases).toFixed(2)) : null;
-    const ctr          = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0;
+    // Agréger les métriques de tous les comptes
+    let totalSpend = 0, impressions = 0, clicks = 0, purchases = 0;
+    const allCampaigns = [];
 
-    const campaigns = (campaignsResp.data || [])
-      .filter(c => c.insights?.data?.[0]?.spend > 0)
-      .map(c => {
-        const ci = c.insights.data[0];
-        const cpurchases = parseInt(ci.actions?.find(a => a.action_type === 'purchase')?.value || 0);
-        return {
-          name: c.name,
-          status: c.status,
-          spend: parseFloat(ci.spend || 0),
-          impressions: parseInt(ci.impressions || 0),
-          clicks: parseInt(ci.clicks || 0),
-          roas: parseFloat(ci.purchase_roas?.[0]?.value || 0),
-          purchases: cpurchases,
-          cpa: cpurchases > 0 ? parseFloat((parseFloat(ci.spend) / cpurchases).toFixed(2)) : null
-        };
-      })
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, 5);
+    for (const { insightsResp, campaignsResp } of allResults) {
+      const ins = insightsResp.data?.[0] || {};
+      totalSpend  += parseFloat(ins.spend || 0);
+      impressions += parseInt(ins.impressions || 0);
+      clicks      += parseInt(ins.clicks || 0);
+      purchases   += parseInt(ins.actions?.find(a => a.action_type === 'purchase')?.value || 0);
 
-    console.log(`  → Meta: ${totalSpend.toFixed(0)}€ · ROAS ${roas.toFixed(1)}x · CPA ${cpa ?? 'N/A'}€ · ${purchases} achats`);
-    return { spend: totalSpend, impressions, clicks, purchases, roas, cpa, ctr, campaigns, period: { since, until } };
+      const camps = (campaignsResp.data || [])
+        .filter(c => c.insights?.data?.[0]?.spend > 0)
+        .map(c => {
+          const ci = c.insights.data[0];
+          const cp = parseInt(ci.actions?.find(a => a.action_type === 'purchase')?.value || 0);
+          return {
+            name: c.name, status: c.status,
+            spend: parseFloat(ci.spend || 0),
+            impressions: parseInt(ci.impressions || 0),
+            clicks: parseInt(ci.clicks || 0),
+            roas: parseFloat(ci.purchase_roas?.[0]?.value || 0),
+            purchases: cp,
+            cpa: cp > 0 ? parseFloat((parseFloat(ci.spend) / cp).toFixed(2)) : null
+          };
+        });
+      allCampaigns.push(...camps);
+    }
+
+    const roas      = purchases > 0 && totalSpend > 0 ? parseFloat((purchases * 30 / totalSpend).toFixed(2)) : 0; // estimation sans revenue
+    const cpa       = purchases > 0 ? parseFloat((totalSpend / purchases).toFixed(2)) : null;
+    const ctr       = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0;
+    const campaigns = allCampaigns.sort((a, b) => b.spend - a.spend).slice(0, 6);
+
+    console.log(`  → Meta (${accountIds.length} comptes): ${totalSpend.toFixed(0)}€ · CPA ${cpa ?? 'N/A'}€ · ${purchases} achats`);
+    return { spend: totalSpend, impressions, clicks, purchases, roas, cpa, ctr, campaigns, period: { since, until }, accountCount: accountIds.length };
 
   } catch (err) {
     console.warn(`⚠️  Meta API erreur (non bloquant): ${err.message}`);
