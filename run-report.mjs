@@ -260,16 +260,109 @@ Règles IMPORTANTES :
 7. Les URLs Foreplay : format https://app.foreplay.co/discovery?ad=<id>
 8. Pour les pays sans données (ex: DACH si aucune marque DACH cette semaine), retourne un objet avec adsCount:0 et les autres champs en tableaux vides`;
 
+  const countrySchema = {
+    type: 'object',
+    properties: {
+      adsCount:  { type: 'integer' },
+      liveCount: { type: 'integer' },
+      brands: { type: 'array', items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' }, adsCount: { type: 'integer' }, liveCount: { type: 'integer' },
+          formats: { type: 'string' }, topAngle: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } }
+        }, required: ['name', 'adsCount', 'liveCount']
+      }},
+      topAds: { type: 'array', items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' }, brand: { type: 'string' }, format: { type: 'string' },
+          days: { type: 'integer' }, hook: { type: 'string' }, angle: { type: 'string' },
+          img: { type: 'string' }, url: { type: 'string' }, live: { type: 'boolean' }
+        }, required: ['id', 'brand', 'format', 'url']
+      }},
+      trends: { type: 'array', items: {
+        type: 'object',
+        properties: { icon: { type: 'string' }, title: { type: 'string' }, desc: { type: 'string' }, evidence: { type: 'string' } },
+        required: ['icon', 'title', 'desc']
+      }},
+      creativeTests: { type: 'array', items: {
+        type: 'object',
+        properties: { title: { type: 'string' }, hook: { type: 'string' }, count: { type: 'integer' }, brand: { type: 'string' } },
+        required: ['title', 'hook']
+      }},
+      recommendation: {
+        type: 'object',
+        properties: {
+          product: { type: 'string' }, format: { type: 'string' }, hook: { type: 'string' },
+          inspiration: { type: 'string' }, priority: { type: 'string', enum: ['Haute', 'Moyenne', 'Basse'] }
+        }
+      }
+    },
+    required: ['adsCount', 'liveCount', 'brands', 'topAds', 'trends', 'creativeTests', 'recommendation']
+  };
+
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 10000,
+    max_tokens: 16000,
+    tools: [{
+      name: 'publish_veille',
+      description: 'Publie l\'analyse de veille concurrence hebdomadaire structurée',
+      input_schema: {
+        type: 'object',
+        required: ['weekLabel', 'totalAds', 'activeBrands', 'globalInsights', 'countries', 'atm'],
+        properties: {
+          weekLabel:     { type: 'string' },
+          totalAds:      { type: 'integer' },
+          activeBrands:  { type: 'integer' },
+          globalInsights: { type: 'array', items: { type: 'string' } },
+          countries: {
+            type: 'object',
+            properties: { fr: countrySchema, dach: countrySchema, uk: countrySchema, us: countrySchema, global: countrySchema },
+            required: ['fr', 'dach', 'uk', 'us', 'global']
+          },
+          atm: {
+            type: 'object',
+            required: ['totalAds', 'liveAds', 'brands', 'topAds', 'insights'],
+            properties: {
+              totalAds:  { type: 'integer' },
+              liveAds:   { type: 'integer' },
+              brands: { type: 'array', items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' }, adsCount: { type: 'integer' }, liveCount: { type: 'integer' },
+                  market: { type: 'string' }, formats: { type: 'string' }, topAngle: { type: 'string' },
+                  tags: { type: 'array', items: { type: 'string' } }
+                }, required: ['name', 'adsCount', 'liveCount']
+              }},
+              topAds: { type: 'array', items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' }, brand: { type: 'string' }, format: { type: 'string' },
+                  days: { type: 'integer' }, hook: { type: 'string' }, img: { type: 'string' },
+                  url: { type: 'string' }, live: { type: 'boolean' }
+                }, required: ['id', 'brand', 'format', 'url']
+              }},
+              insights: { type: 'array', items: {
+                type: 'object',
+                properties: { icon: { type: 'string' }, title: { type: 'string' }, desc: { type: 'string' }, evidence: { type: 'string' } },
+                required: ['icon', 'title', 'desc']
+              }}
+            }
+          }
+        }
+      }
+    }],
+    tool_choice: { type: 'any' },
     messages: [{ role: 'user', content: prompt }]
   });
 
-  let text = message.content[0].text.trim();
-  // Strip markdown code fences if Claude wrapped the JSON
+  // Extract structured output from tool use (guaranteed valid JSON)
+  const toolUse = message.content.find(b => b.type === 'tool_use');
+  if (toolUse) return toolUse.input;
+
+  // Fallback: parse text response
+  let text = (message.content[0]?.text || '').trim();
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  // If there's still no valid start, extract the first {...} block
   if (!text.startsWith('{')) {
     const match = text.match(/\{[\s\S]*\}/);
     if (match) text = match[0];
