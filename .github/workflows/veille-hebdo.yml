@@ -2,17 +2,23 @@ name: Veille Concurrence Hebdomadaire
 
 on:
   schedule:
+    # Lundi + Jeudi 8h07 heure Paris (UTC+1 hiver = 7h07 UTC, UTC+2 été = 6h07 UTC)
+    # On utilise 7h07 UTC → 8h07 en hiver, 9h07 en été
     - cron: '7 7 * * 1,4'
-  workflow_dispatch:
+  workflow_dispatch: # Permet de lancer manuellement depuis GitHub
 
+# Permissions nécessaires pour publier sur GitHub Pages
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: write   # Pour git push vers le repo
+  pages: write      # Pour déployer GitHub Pages
+  id-token: write   # Pour l'authentification GitHub Pages
 
 jobs:
   veille:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages-url.outputs.url }}
 
     steps:
       - name: Checkout repo
@@ -26,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Configurer Git
+      - name: Configurer Git (pour le push GitHub Pages)
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -37,18 +43,32 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FOREPLAY_API_KEY: ${{ secrets.FOREPLAY_API_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Publier sur GitHub Pages
         run: |
           git add docs/
+          git status
           git diff --staged --quiet || git commit -m "Rapport veille concurrence $(date +%Y-%m-%d)"
           git push origin ${{ github.ref_name }}
 
-      - name: Sauvegarder le rapport comme artifact
+      - name: Afficher l'URL du rapport
+        id: pages-url
+        run: |
+          REPO="${{ github.repository }}"
+          USER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          TODAY=$(date +%Y-%m-%d)
+          URL="https://${USER}.github.io/${REPO_NAME}/rapport-veille-concu-${TODAY}.html"
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "🔗 Rapport disponible sur : ${URL}"
+
+      - name: Sauvegarder le rapport HTML comme artifact Actions
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: rapport-veille-${{ github.run_number }}
-          path: docs/rapport-veille-*.html
+          path: rapport-veille-*.html
           retention-days: 30
