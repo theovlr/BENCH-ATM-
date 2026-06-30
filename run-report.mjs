@@ -9,8 +9,10 @@ const FOREPLAY_API_KEY   = process.env.FOREPLAY_API_KEY;
 const SLACK_BOT_TOKEN    = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL_ID   = 'C0BDJS75E04'; // #veille-concu-fr
 const FOREPLAY_BASE      = 'https://public.api.foreplay.co';
-const META_ACCESS_TOKEN  = process.env.META_ACCESS_TOKEN;
-const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID; // ex: "123456789" ou "act_123456789"
+const META_ACCESS_TOKEN   = process.env.META_ACCESS_TOKEN;
+const META_AD_ACCOUNT_ID  = process.env.META_AD_ACCOUNT_ID;  // comptes BM1, séparés par virgule
+const META_ACCESS_TOKEN_2 = process.env.META_ACCESS_TOKEN_2;
+const META_AD_ACCOUNT_ID_2 = process.env.META_AD_ACCOUNT_ID_2; // comptes BM2, séparés par virgule
 
 // GitHub Pages — format : "username/repo-name" injecté automatiquement par GitHub Actions
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || '';
@@ -134,19 +136,24 @@ async function fetchMetaData() {
     return null;
   }
 
-  const accountIds = META_AD_ACCOUNT_ID.split(',').map(id => {
-    id = id.trim();
-    return id.startsWith('act_') ? id : `act_${id}`;
-  });
+  // Construire la liste des comptes avec leur token respectif
+  const toIds = (raw, token) => (raw || '').split(',')
+    .map(id => id.trim()).filter(Boolean)
+    .map(id => ({ id: id.startsWith('act_') ? id : `act_${id}`, token }));
+
+  const accountIds = [
+    ...toIds(META_AD_ACCOUNT_ID, META_ACCESS_TOKEN),
+    ...toIds(META_AD_ACCOUNT_ID_2, META_ACCESS_TOKEN_2),
+  ];
 
   const today = new Date();
   const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
   const since = weekAgo.toISOString().split('T')[0];
   const until = today.toISOString().split('T')[0];
 
-  const metaGet = async (path, params = {}) => {
+  const metaGet = async (path, params = {}, token = META_ACCESS_TOKEN) => {
     const url = new URL(`https://graph.facebook.com/v21.0${path}`);
-    url.searchParams.set('access_token', META_ACCESS_TOKEN);
+    url.searchParams.set('access_token', token);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     const res = await fetch(url.toString());
     if (!res.ok) { const b = await res.text(); throw new Error(`Meta ${res.status}: ${b}`); }
@@ -156,17 +163,17 @@ async function fetchMetaData() {
   try {
     console.log(`📱 Récupération données Meta Ads (${accountIds.length} comptes)...`);
 
-    const allResults = await Promise.all(accountIds.map(async accountId => {
+    const allResults = await Promise.all(accountIds.map(async ({ id: accountId, token }) => {
       const [insightsResp, campaignsResp] = await Promise.all([
         metaGet(`/${accountId}/insights`, {
           fields: 'spend,impressions,clicks,actions,purchase_roas',
           time_range: JSON.stringify({ since, until }),
           level: 'account'
-        }),
+        }, token),
         metaGet(`/${accountId}/campaigns`, {
           fields: `name,status,insights.time_range({"since":"${since}","until":"${until}"}){spend,impressions,clicks,actions,purchase_roas}`,
           limit: 20
-        })
+        }, token)
       ]);
       return { accountId, insightsResp, campaignsResp };
     }));
@@ -418,7 +425,7 @@ Règles IMPORTANTES :
           countries: {
             type: 'object',
             properties: { fr: countrySchema, dach: countrySchema, uk: countrySchema, us: countrySchema, global: countrySchema, it: countrySchema, es: countrySchema, nl: countrySchema },
-            required: ['fr', 'dach', 'uk', 'us', 'global', 'it', 'es', 'nl']
+            required: ['fr', 'dach', 'uk', 'us', 'global']
           },
           atm: {
             type: 'object',
@@ -499,12 +506,13 @@ function generateHTML(a) {
     nl:     { flag: '🇳🇱', name: 'Pays-Bas',accent: '#06b6d4' },
   };
 
-  const totalByCountry = Object.entries(a.countries)
-    .map(([k, v]) => `${countryMeta[k]?.flag} ${countryMeta[k]?.name} <span style="opacity:.5;font-size:11px">${v.adsCount} pubs</span>`)
-    .join('');
+  // Filtre les pays sans données ou non reconnus, assure un objet valide pour chaque pays
+  const validCountries = Object.entries(a.countries || {})
+    .filter(([k, v]) => v && typeof v === 'object' && countryMeta[k])
+    .map(([k, v]) => [k, { adsCount: 0, liveCount: 0, brands: [], topAds: [], trends: [], creativeTests: [], recommendation: {}, ...v }]);
 
-  const countryTabsHtml = Object.entries(a.countries)
-    .map(([k, v]) => `<div class="ctab ${k==='global'?'active':''}" data-country="${k}" onclick="switchCountry('${k}')">${countryMeta[k]?.flag} ${countryMeta[k]?.name} <span style="opacity:.5;font-size:11px">${v.adsCount} pubs</span></div>`)
+  const countryTabsHtml = validCountries
+    .map(([k, v]) => `<div class="ctab ${k==='fr'?'active':''}" data-country="${k}" onclick="switchCountry('${k}')">${countryMeta[k]?.flag} ${countryMeta[k]?.name} <span style="opacity:.5;font-size:11px">${v.adsCount} pubs</span></div>`)
     .join('') + `<div class="ctab" data-country="atm" onclick="switchCountry('atm')">📊 Mes Perfs ATM <span style="opacity:.5;font-size:11px">${a.atm?.totalAds||0} pubs</span></div>`;
 
   return `<!DOCTYPE html>
@@ -966,8 +974,10 @@ async function slackPost(method, body, isForm = false) {
 
 async function postReportToSlack(analysis, htmlFilename, pageUrl) {
   const bullets = analysis.globalInsights.slice(0, 5).join('\n');
-  const countryStats = Object.entries(analysis.countries)
-    .map(([k, v]) => `${k === 'fr' ? '🇫🇷' : k === 'dach' ? '🇩🇪' : k === 'uk' ? '🇬🇧' : k === 'us' ? '🇺🇸' : '🌍'} ${v.adsCount} pubs`)
+  const flagMap = { fr:'🇫🇷', dach:'🇩🇪', uk:'🇬🇧', us:'🇺🇸', it:'🇮🇹', es:'🇪🇸', nl:'🇳🇱', global:'🌍' };
+  const countryStats = Object.entries(analysis.countries || {})
+    .filter(([, v]) => v && v.adsCount > 0)
+    .map(([k, v]) => `${flagMap[k]||'🌍'} ${v.adsCount} pubs`)
     .join(' · ');
 
   const linkBlock = pageUrl
@@ -1054,7 +1064,7 @@ async function main() {
   if (data.competitors.length === 0) throw new Error('Aucune donnée concurrente récupérée. Vérifie ta clé API Foreplay.');
 
   const analysis = await analyzeWithClaude(data);
-  const totalPays = Object.values(analysis.countries).reduce((n, c) => n + (c.adsCount||0), 0);
+  const totalPays = Object.values(analysis.countries || {}).filter(Boolean).reduce((n, c) => n + (c.adsCount||0), 0);
   console.log(`  → Analyse OK : ${totalPays} pubs · ${analysis.activeBrands} marques · ${Object.keys(analysis.countries).length} pays`);
 
   const today = new Date().toISOString().split('T')[0];
