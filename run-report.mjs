@@ -4,11 +4,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const FOREPLAY_API_KEY  = process.env.FOREPLAY_API_KEY;
-const SLACK_BOT_TOKEN   = process.env.SLACK_BOT_TOKEN;
-const SLACK_CHANNEL_ID  = 'C0BDJS75E04'; // #veille-concu-fr
-const FOREPLAY_BASE     = 'https://public.api.foreplay.co';
+const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
+const FOREPLAY_API_KEY   = process.env.FOREPLAY_API_KEY;
+const SLACK_BOT_TOKEN    = process.env.SLACK_BOT_TOKEN;
+const SLACK_CHANNEL_ID   = 'C0BDJS75E04'; // #veille-concu-fr
+const FOREPLAY_BASE      = 'https://public.api.foreplay.co';
+const META_ACCESS_TOKEN  = process.env.META_ACCESS_TOKEN;
+const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID; // ex: "123456789" ou "act_123456789"
 
 // GitHub Pages — format : "username/repo-name" injecté automatiquement par GitHub Actions
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || '';
@@ -91,7 +93,7 @@ async function getBrandAds(brandId) {
 
 async function fetchAllData() {
   console.log('📡 Récupération des marques Foreplay Spyder...');
-  const allBrands = await getSpyderBrands();
+  const [allBrands, meta] = await Promise.all([getSpyderBrands(), fetchMetaData()]);
   console.log(`  → ${allBrands.length} marques trouvées`);
 
   const competitorBrands = allBrands.filter(b => !isOwnBrand(b.name) && !isIrrelevant(b.name));
@@ -111,6 +113,7 @@ async function fetchAllData() {
   ]);
 
   return {
+    meta,
     competitors: competitorResults
       .filter(r => r.status === 'fulfilled' && r.value.ads.length > 0)
       .map(r => r.value),
@@ -118,6 +121,81 @@ async function fetchAllData() {
       .filter(r => r.status === 'fulfilled')
       .map(r => r.value)
   };
+}
+
+// ─── Meta Ads API ──────────────────────────────────────────────────────────────
+
+async function fetchMetaData() {
+  if (!META_ACCESS_TOKEN || !META_AD_ACCOUNT_ID) {
+    console.log('ℹ️  META_ACCESS_TOKEN / META_AD_ACCOUNT_ID non configurés — section ATM sans données Meta');
+    return null;
+  }
+
+  const accountId = META_AD_ACCOUNT_ID.startsWith('act_') ? META_AD_ACCOUNT_ID : `act_${META_AD_ACCOUNT_ID}`;
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  const since = weekAgo.toISOString().split('T')[0];
+  const until = today.toISOString().split('T')[0];
+
+  const metaGet = async (path, params = {}) => {
+    const url = new URL(`https://graph.facebook.com/v21.0${path}`);
+    url.searchParams.set('access_token', META_ACCESS_TOKEN);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString());
+    if (!res.ok) { const b = await res.text(); throw new Error(`Meta ${res.status}: ${b}`); }
+    return res.json();
+  };
+
+  try {
+    console.log('📱 Récupération données Meta Ads...');
+
+    const [insightsResp, campaignsResp] = await Promise.all([
+      metaGet(`/${accountId}/insights`, {
+        fields: 'spend,impressions,clicks,actions,cost_per_action_type,purchase_roas,action_values',
+        time_range: JSON.stringify({ since, until }),
+        level: 'account'
+      }),
+      metaGet(`/${accountId}/campaigns`, {
+        fields: `name,status,insights.time_range({"since":"${since}","until":"${until}"}){spend,impressions,clicks,actions,purchase_roas}`,
+        limit: 20
+      })
+    ]);
+
+    const ins = insightsResp.data?.[0] || {};
+    const totalSpend   = parseFloat(ins.spend || 0);
+    const impressions  = parseInt(ins.impressions || 0);
+    const clicks       = parseInt(ins.clicks || 0);
+    const purchases    = parseInt(ins.actions?.find(a => a.action_type === 'purchase')?.value || 0);
+    const roas         = parseFloat(ins.purchase_roas?.[0]?.value || 0);
+    const cpa          = purchases > 0 ? parseFloat((totalSpend / purchases).toFixed(2)) : null;
+    const ctr          = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0;
+
+    const campaigns = (campaignsResp.data || [])
+      .filter(c => c.insights?.data?.[0]?.spend > 0)
+      .map(c => {
+        const ci = c.insights.data[0];
+        const cpurchases = parseInt(ci.actions?.find(a => a.action_type === 'purchase')?.value || 0);
+        return {
+          name: c.name,
+          status: c.status,
+          spend: parseFloat(ci.spend || 0),
+          impressions: parseInt(ci.impressions || 0),
+          clicks: parseInt(ci.clicks || 0),
+          roas: parseFloat(ci.purchase_roas?.[0]?.value || 0),
+          purchases: cpurchases,
+          cpa: cpurchases > 0 ? parseFloat((parseFloat(ci.spend) / cpurchases).toFixed(2)) : null
+        };
+      })
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 5);
+
+    console.log(`  → Meta: ${totalSpend.toFixed(0)}€ · ROAS ${roas.toFixed(1)}x · CPA ${cpa ?? 'N/A'}€ · ${purchases} achats`);
+    return { spend: totalSpend, impressions, clicks, purchases, roas, cpa, ctr, campaigns, period: { since, until } };
+
+  } catch (err) {
+    console.warn(`⚠️  Meta API erreur (non bloquant): ${err.message}`);
+    return null;
+  }
 }
 
 // ─── Analyse Claude ────────────────────────────────────────────────────────────
@@ -143,6 +221,9 @@ ${JSON.stringify(data.competitors, null, 2)}
 
 MARQUES ATM GAMING (pour la section "Mes Perfs") :
 ${JSON.stringify(data.ownBrands, null, 2)}
+
+DONNÉES META ADS ATM GAMING (semaine en cours) :
+${data.meta ? JSON.stringify(data.meta, null, 2) : 'Non disponible (META_ACCESS_TOKEN non configuré)'}
 
 Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans \`\`\`, sans texte avant ou après) avec cette structure exacte :
 
@@ -324,8 +405,22 @@ Règles IMPORTANTES :
             type: 'object',
             required: ['totalAds', 'liveAds', 'brands', 'topAds', 'insights'],
             properties: {
-              totalAds:  { type: 'integer' },
-              liveAds:   { type: 'integer' },
+              totalAds:    { type: 'integer' },
+              liveAds:     { type: 'integer' },
+              spend:       { type: 'number', description: 'Dépenses Meta Ads cette semaine en euros' },
+              roas:        { type: 'number', description: 'ROAS Meta Ads (retour sur dépenses pub)' },
+              cpa:         { type: 'number', description: 'CPA moyen en euros (coût par achat)' },
+              ctr:         { type: 'number', description: 'CTR moyen en %' },
+              purchases:   { type: 'integer', description: 'Nombre total d\'achats attribués' },
+              impressions: { type: 'integer', description: 'Nombre total d\'impressions' },
+              topCampaigns: { type: 'array', items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' }, spend: { type: 'number' },
+                  roas: { type: 'number' }, cpa: { type: 'number' },
+                  purchases: { type: 'integer' }, status: { type: 'string' }
+                }, required: ['name', 'spend']
+              }},
               brands: { type: 'array', items: {
                 type: 'object',
                 properties: {
@@ -745,20 +840,46 @@ function renderATM() {
       </div>
     </div>\`).join('');
 
+  const hasMetaData = atm.spend != null && atm.spend > 0;
+  const bannerHtml = hasMetaData
+    ? \`<div class="demo-banner" style="border-left-color:#10b981;background:rgba(16,185,129,.08)"><span class="demo-badge" style="background:#10b981">META ADS LIVE</span><div class="demo-text">Données Meta Ads réelles — semaine du \${ANALYSIS.weekLabel}.</div></div>\`
+    : \`<div class="demo-banner"><span class="demo-badge">FOREPLAY DATA</span><div class="demo-text">Données Foreplay Spyder. Ajoutez META_ACCESS_TOKEN et META_AD_ACCOUNT_ID comme secrets GitHub pour le CPA/ROAS réel.</div></div>\`;
+
+  const campaignsHtml = (atm.topCampaigns||[]).length > 0 ? \`
+    <div class="section-head" style="margin-top:20px"><h2>🎯 Top campagnes Meta cette semaine</h2></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      \${(atm.topCampaigns||[]).map(c => \`
+        <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="font-weight:600;color:#e2e8f0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\${c.name}</div>
+          <div style="display:flex;gap:16px;flex-shrink:0;font-size:13px">
+            <span style="color:#f59e0b;font-weight:700">\${c.spend?.toFixed(0)}€</span>
+            \${c.roas ? \`<span style="color:#10b981">ROAS \${c.roas?.toFixed(1)}x</span>\` : ''}
+            \${c.cpa ? \`<span style="color:#60a5fa">CPA \${c.cpa?.toFixed(0)}€</span>\` : ''}
+            \${c.purchases ? \`<span style="color:#a78bfa">\${c.purchases} achats</span>\` : ''}
+          </div>
+          <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:\${c.status==='ACTIVE'?'rgba(16,185,129,.2)':'rgba(107,114,128,.2)'};color:\${c.status==='ACTIVE'?'#10b981':'#9ca3af'}">\${c.status==='ACTIVE'?'Live':'Pausée'}</span>
+        </div>\`).join('')}
+    </div>\` : '';
+
   mc.innerHTML = \`
-    <div class="demo-banner">
-      <span class="demo-badge">FOREPLAY DATA</span>
-      <div class="demo-text">Données directement depuis Foreplay Spyder. Pour CPA, ROAS et budget réel : connecter le MCP Meta Ads (configuration en cours).</div>
-    </div>
+    \${bannerHtml}
     <div class="section-head"><h2>📊 Mes Performances ATM Gaming — \${ANALYSIS.weekLabel}</h2></div>
     <div class="atm-kpis">
       <div class="atm-kpi"><div class="atm-kpi-val">\${atm.totalAds||0}</div><div class="atm-kpi-label">Pubs actives total</div><div class="atm-kpi-note">\${(atm.brands||[]).map(b=>b.name.split(' ')[0]+' '+b.adsCount).join(' · ')}</div></div>
       <div class="atm-kpi"><div class="atm-kpi-val">\${atm.liveAds||0}</div><div class="atm-kpi-label">Pubs live en ce moment</div><div class="atm-kpi-note">\${Math.round(((atm.liveAds||0)/(atm.totalAds||1))*100)}% du parc actif</div></div>
-      <div class="atm-kpi"><div class="atm-kpi-val">\${(atm.brands||[]).length}</div><div class="atm-kpi-label">Marques en campagne</div><div class="atm-kpi-note">suivi hebdomadaire</div></div>
-      <div class="atm-kpi" style="border-top-color:#6b7280"><div class="atm-kpi-val" style="color:#6b7280">—</div><div class="atm-kpi-label">CPA / ROAS</div><div class="atm-kpi-note">MCP Meta Ads requis</div></div>
+      \${hasMetaData ? \`
+        <div class="atm-kpi" style="border-top-color:#f59e0b"><div class="atm-kpi-val" style="color:#f59e0b">\${atm.spend?.toFixed(0)}€</div><div class="atm-kpi-label">Budget dépensé</div><div class="atm-kpi-note">7 derniers jours</div></div>
+        <div class="atm-kpi" style="border-top-color:#10b981"><div class="atm-kpi-val" style="color:#10b981">\${atm.roas?.toFixed(1) || '—'}x</div><div class="atm-kpi-label">ROAS</div><div class="atm-kpi-note">Retour sur dépenses</div></div>
+        <div class="atm-kpi" style="border-top-color:#60a5fa"><div class="atm-kpi-val" style="color:#60a5fa">\${atm.cpa?.toFixed(0) || '—'}€</div><div class="atm-kpi-label">CPA moyen</div><div class="atm-kpi-note">\${atm.purchases||0} achats</div></div>
+        <div class="atm-kpi" style="border-top-color:#a78bfa"><div class="atm-kpi-val" style="color:#a78bfa">\${atm.ctr?.toFixed(1)||'—'}%</div><div class="atm-kpi-label">CTR moyen</div><div class="atm-kpi-note">\${((atm.impressions||0)/1000).toFixed(0)}k impressions</div></div>
+      \` : \`
+        <div class="atm-kpi"><div class="atm-kpi-val">\${(atm.brands||[]).length}</div><div class="atm-kpi-label">Marques en campagne</div><div class="atm-kpi-note">suivi hebdomadaire</div></div>
+        <div class="atm-kpi" style="border-top-color:#6b7280"><div class="atm-kpi-val" style="color:#6b7280">—</div><div class="atm-kpi-label">CPA / ROAS</div><div class="atm-kpi-note">Ajouter META_ACCESS_TOKEN</div></div>
+      \`}
     </div>
     <div class="section-head"><h2>Mes marques actives</h2></div>
     <div class="brands-grid">\${brandsHtml}</div>
+    \${campaignsHtml}
     <div class="section-head" style="margin-top:20px"><h2>Meilleures pubs ATM Gaming</h2></div>
     <div class="ads-grid">\${topHtml}</div>
     <div class="section-head" style="margin-top:20px"><h2>Insights stratégiques</h2></div>
