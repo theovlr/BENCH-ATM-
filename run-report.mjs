@@ -234,22 +234,21 @@ async function analyzeWithClaude(data) {
   // Trim data to stay within token limits — keep only analysis-relevant fields
   const trimmedCompetitors = data.competitors.map(b => ({
     brand: b.brand,
-    ads: b.ads.slice(0, 10).map(ad => ({
+    ads: b.ads.slice(0, 6).map(ad => ({
       id: ad.id,
       format: ad.format,
       days_active: ad.days_active,
-      start_date: ad.start_date,
-      hook_text: (ad.hook_text || '').substring(0, 180),
+      hook_text: (ad.hook_text || '').substring(0, 100),
       url: ad.url,
     }))
   }));
   const trimmedOwn = data.ownBrands.map(b => ({
     brand: b.brand,
-    ads: b.ads.slice(0, 15).map(ad => ({
+    ads: b.ads.slice(0, 10).map(ad => ({
       id: ad.id,
       format: ad.format,
       days_active: ad.days_active,
-      hook_text: (ad.hook_text || '').substring(0, 180),
+      hook_text: (ad.hook_text || '').substring(0, 100),
       url: ad.url,
     }))
   }));
@@ -381,9 +380,9 @@ Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans \`\`\`, sans texte
 }
 
 Règles IMPORTANTES :
-1. Chaque pays dans "countries" doit avoir MINIMUM 3 creativeTests — si tu n'en vois que 1-2, crée des suggestions hypothétiques à tester basées sur les tendances observées, en le signalant dans le titre ("Suggestion A/B : ...")
-2. topAds : maximum 6 pubs par pays, les plus récentes ou les plus longues en premier
-3. trends : 3 à 4 tendances par pays, chiffrées avec exemples réels
+1. Chaque pays dans "countries" doit avoir MINIMUM 2 creativeTests — si tu n'en vois pas, crée des suggestions hypothétiques ("Suggestion A/B : ...")
+2. topAds : maximum 4 pubs par pays, les plus récentes ou les plus longues en premier
+3. trends : 2 à 3 tendances par pays, chiffrées avec exemples réels
 4. recommendation : 1 recommandation actionnable par pays pour ATM Gaming
 5. Ignore les marques hors jeux de société / entertainment (dating, food, beauté)
 6. Tous les textes en français
@@ -433,7 +432,7 @@ Règles IMPORTANTES :
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
+    max_tokens: 32000,
     tools: [{
       name: 'publish_veille',
       description: 'Publie l\'analyse de veille concurrence hebdomadaire structurée',
