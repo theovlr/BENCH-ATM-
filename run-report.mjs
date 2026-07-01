@@ -430,9 +430,10 @@ Règles IMPORTANTES :
     required: ['adsCount', 'liveCount', 'brands', 'topAds', 'trends', 'creativeTests', 'recommendation']
   };
 
-  const message = await client.messages.create({
+  // Utiliser le streaming pour éviter le timeout sur les longues réponses (8 pays × analyse complète)
+  const stream = client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 32000,
+    max_tokens: 28000,
     tools: [{
       name: 'publish_veille',
       description: 'Publie l\'analyse de veille concurrence hebdomadaire structurée',
@@ -498,6 +499,8 @@ Règles IMPORTANTES :
     tool_choice: { type: 'any' },
     messages: [{ role: 'user', content: prompt }]
   });
+
+  const message = await stream.finalMessage();
 
   // Extract structured output from tool use (guaranteed valid JSON)
   if (message.stop_reason === 'max_tokens') {
