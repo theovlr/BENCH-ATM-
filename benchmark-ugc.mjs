@@ -4,21 +4,13 @@
 
 import OpenAI from 'openai';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import {
-  getSpyderBrands, getBrandAds,
-  classifyCountry, isOwnBrand, isIrrelevant,
-} from './lib/foreplay-shared.mjs';
+import atmBrandsConfig from './config/atm-brands.json' with { type: 'json' };
+import { getSpyderBrands, getBrandAdsRaw } from './lib/foreplay-shared.mjs';
+import { normalizeAd } from './lib/normalize.mjs';
+import { classifyAd } from './lib/classify.mjs';
+import { nullLongevityRate, emptyHookRate } from './lib/metrics.mjs';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-// Produits absents de OWN_BRAND_KEYWORDS (lib/foreplay-shared.mjs) : on les ajoute
-// localement pour ne pas faire remonter ces marques ATM comme concurrentes si elles
-// sont suivies sur Foreplay Spyder. On ne touche pas au module partagé pour ça.
-const EXTRA_OWN_BRAND_KEYWORDS = ['osmooz', 'intimoos', 'rank king', 'holy sheep'];
-function isOwnBrandExtended(name) {
-  const n = (name || '').toLowerCase();
-  return isOwnBrand(name) || EXTRA_OWN_BRAND_KEYWORDS.some(kw => n.includes(kw));
-}
 
 const ATM_CATALOG = [
   'Speedbac', 'Pili Pili', 'JUMO', 'Quickstop', 'Mouton Mouton (Holy Sheep)',
@@ -47,43 +39,68 @@ function sanitizeDeep(value) {
 
 // ─── Collecte des données Foreplay ─────────────────────────────────────────────
 
+// Récupère TOUTES les marques Spyder (aucun filtre en amont : les marques ATM ne
+// sont plus retirées, elles sont taguées owner:'atm' par classifyAd) et retourne
+// un tableau PLAT de pubs classifiées (schéma Ad canonique). Les regroupements par
+// marché/marque pour le dashboard HTML existant sont dérivés plus tard par
+// buildBenchmarkView, jamais figés ici (spec §4.3).
 async function fetchBenchmarkData() {
   console.log('📡 Récupération des marques Foreplay Spyder...');
   const allBrands = await getSpyderBrands();
   console.log(`  → ${allBrands.length} marques trouvées`);
 
-  const competitorBrands = allBrands.filter(b => !isOwnBrandExtended(b.name) && !isIrrelevant(b.name));
-  console.log(`  → ${competitorBrands.length} concurrents suivis`);
-
-  const results = await Promise.allSettled(competitorBrands.map(async b => {
-    const ads = await getBrandAds(b.id);
-    return { name: b.name, market: classifyCountry(b.name), ads };
+  const results = await Promise.allSettled(allBrands.map(async brand => {
+    const rawAds = await getBrandAdsRaw(brand.id, { maxAds: 250 });
+    const ads = rawAds
+      .map(rawAd => normalizeAd(rawAd, brand))
+      .map(ad => classifyAd(ad, brand, atmBrandsConfig));
+    return ads;
   }));
 
-  const brands = results
-    .filter(r => r.status === 'fulfilled' && r.value.ads.length > 0)
-    .map(r => r.value);
+  const failedBrands = results.filter(r => r.status === 'rejected').length;
+  if (failedBrands) console.warn(`⚠️  ${failedBrands} marque(s) non récupérée(s) (non bloquant)`);
+
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .flatMap(r => r.value);
+}
+
+// ─── Dérivation du regroupement par marché pour le dashboard HTML existant ─────
+
+// Reconstruit EXACTEMENT l'ancienne forme { [market]: { brands: [...], topPerformers: [...] } }
+// attendue par analyzeTrends/analyzeUGC/buildTaglinesCompetitors/generateHTML, à
+// partir du tableau plat `ads` (classifié par classifyAd). Le dashboard "Pubs
+// concurrentes" ne montre que les concurrents en périmètre (in_scope:true et
+// owner:'competitor'), comme le faisait l'ancien filtre isOwnBrandExtended/isIrrelevant ;
+// le dataset canonique complet (ATM inclus, hors-périmètre inclus) reste écrit à part
+// dans data/dataset-<date>.json par main().
+function buildBenchmarkView(ads) {
+  const competitorAds = ads.filter(ad => ad.in_scope === true && ad.owner === 'competitor');
 
   // Regroupement par marché : { fr: { brands: [...] }, dach: { brands: [...] }, ... }
   const benchmark = {};
   for (const market of MARKETS) benchmark[market] = { brands: [] };
-  for (const brand of brands) {
-    if (!benchmark[brand.market]) benchmark[brand.market] = { brands: [] };
-    benchmark[brand.market].brands.push({
-      name: brand.name,
-      market: brand.market,
-      ads: brand.ads.map(ad => ({
-        id: ad.id,
-        format: ad.format,
-        days_active: ad.days_active,
-        live: ad.live,
-        hook_text: ad.hook_text,
-        url: ad.url,
-      })),
+
+  for (const ad of competitorAds) {
+    const market = ad.market;
+    if (!benchmark[market]) benchmark[market] = { brands: [] };
+    let brand = benchmark[market].brands.find(b => b.name === ad.brand_name);
+    if (!brand) {
+      brand = { name: ad.brand_name, market, ads: [] };
+      benchmark[market].brands.push(brand);
+    }
+    brand.ads.push({
+      id: ad.id,
+      format: ad.format,
+      days_active: ad.running_days,
+      live: ad.live,
+      hook_text: ad.hook,
+      url: ad.foreplay_url,
     });
   }
 
-  // Top performers par marché : live d'abord, puis jours actifs décroissants.
+  // Top performers par marché : live d'abord, puis jours actifs décroissants
+  // (days_active porte désormais la vraie valeur running_days, plus jamais 0 en dur).
   for (const market of MARKETS) {
     const flatAds = benchmark[market].brands.flatMap(b =>
       b.ads.map(ad => ({ ...ad, brand: b.name, market })));
@@ -653,9 +670,31 @@ render();
 async function main() {
   console.log('🚀 ATM Gaming — Benchmark pubs concurrentes + idées UGC\n');
 
-  const benchmark = await fetchBenchmarkData();
-  const totalAds = MARKETS.reduce((n, m) => n + benchmark[m].brands.reduce((s, b) => s + b.ads.length, 0), 0);
-  if (totalAds === 0) throw new Error('Aucune donnée concurrente récupérée. Vérifie ta clé API Foreplay.');
+  const ads = await fetchBenchmarkData();
+  if (ads.length === 0) throw new Error('Aucune donnée récupérée. Vérifie ta clé API Foreplay.');
+
+  // Garde-fous de qualité (spec §9) : on interrompt le run avant toute écriture de
+  // fichier plutôt que de publier un dataset silencieusement dégradé.
+  const nullRate = nullLongevityRate(ads);
+  const hookRate = emptyHookRate(ads);
+  if (nullRate > 0.2) {
+    throw new Error(`Garde-fou qualité : ${(nullRate * 100).toFixed(0)}% des pubs ont running_days = 0 (seuil 20%). Run interrompu, ne pas publier.`);
+  }
+  if (hookRate > 0.3) {
+    throw new Error(`Garde-fou qualité : ${(hookRate * 100).toFixed(0)}% des pubs ont un hook vide (seuil 30%). Run interrompu, ne pas publier.`);
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!existsSync('data')) mkdirSync('data', { recursive: true });
+  writeFileSync(`data/dataset-${today}.json`, JSON.stringify({ generatedAt: today, ads }, null, 2), 'utf8');
+  console.log(`  → Dataset canonique sauvegardé : data/dataset-${today}.json (${ads.length} pubs, ${(nullRate * 100).toFixed(1)}% longévités nulles, ${(hookRate * 100).toFixed(1)}% hooks vides)`);
+
+  const benchmark = buildBenchmarkView(ads);
+  const totalAds = MARKETS.reduce((n, m) => n + (benchmark[m]?.brands || []).reduce((s, b) => s + b.ads.length, 0), 0);
+  const maskedCount = ads.length - totalAds;
+  console.log(`  → ${totalAds} pubs concurrentes en périmètre pour le dashboard (${maskedCount} pubs hors périmètre ou marque ATM masquées de la vue "Pubs concurrentes")`);
+  if (totalAds === 0) throw new Error('Aucune donnée concurrente en périmètre pour le dashboard. Vérifie la classification in_scope/owner.');
 
   const client = new OpenAI({ apiKey: OPENAI_API_KEY, timeout: 300000 });
   const [trends, ugcIdeas] = await Promise.all([
@@ -664,7 +703,7 @@ async function main() {
   ]);
 
   const data = {
-    generatedAt: new Date().toISOString().split('T')[0],
+    generatedAt: today,
     weekLabel: weekLabel(),
     benchmark,
     trends,
@@ -673,9 +712,6 @@ async function main() {
     taglinesUGC: buildTaglinesUGC(ugcIdeas),
   };
 
-  const today = data.generatedAt;
-
-  if (!existsSync('data')) mkdirSync('data', { recursive: true });
   const jsonFilename = `data/benchmark-ugc-${today}.json`;
   writeFileSync(jsonFilename, JSON.stringify(data, null, 2), 'utf8');
   console.log(`  → JSON sauvegardé : ${jsonFilename}`);
