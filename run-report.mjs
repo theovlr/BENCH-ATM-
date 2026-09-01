@@ -3,6 +3,11 @@
 
 import OpenAI from 'openai';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
+import {
+  OWN_BRAND_KEYWORDS, IRRELEVANT_KEYWORDS, COUNTRY_RULES,
+  classifyCountry, isOwnBrand, isIrrelevant,
+  foreplayGet, getSpyderBrands, getBrandAds,
+} from './lib/foreplay-shared.mjs';
 
 const OPENAI_API_KEY     = process.env.OPENAI_API_KEY;
 const FOREPLAY_API_KEY   = process.env.FOREPLAY_API_KEY;
@@ -19,82 +24,6 @@ const GITHUB_REPO = process.env.GITHUB_REPOSITORY || '';
 const GITHUB_PAGES_BASE = GITHUB_REPO
   ? `https://${GITHUB_REPO.split('/')[0]}.github.io/${GITHUB_REPO.split('/')[1]}`
   : '';
-
-// Marques ATM Gaming — séparées des concurrents pour la section "Mes Perfs"
-const OWN_BRAND_KEYWORDS = ['quickstop', 'pili pili', 'speedbac', 'smash it', 'jumo',
-  'play hit', 'mouton mouton', 'little secret', 'ranking', 'atm gaming'];
-
-// Marques hors industrie à ignorer dans l'analyse (dating, food, beauty...)
-const IRRELEVANT_KEYWORDS = ['meetic', 'tinder', 'paired', 'fruitz', 'air up', 'poppi',
-  'holy energy', 'naali', 'my lubie', 'melba'];
-
-// Classification pays par nom de marque (ordre important : plus spécifique en premier)
-const COUNTRY_RULES = [
-  { country: 'it',     keywords: ['clementoni', 'cranio creations', 'ghenos', 'yaqua giochi', 'hilarus', 'sefirot', 'io sono te', 'fler world', 'yasgames'] },
-  { country: 'es',     keywords: ['devir', 'diset', 'gcatalan', 'maldito', 'gen x games', 'ediciones mas', 'sd games'] },
-  { country: 'nl',     keywords: ['999 games', 'jumbo games', 'white goblin', 'identity games', 'just games'] },
-  { country: 'fr',     keywords: ['gigamic', 'bakakou', 'traitres', 'savana', 'olé mains', 'ole mains', 'fabriquedejeux', 'dossiers criminels', 'emblemes', 'emblèmes'] },
-  { country: 'dach',   keywords: ['yaqua', 'crack games', 'crack list', 'holy ', 'weplay'] },
-  { country: 'uk',     keywords: ['big potato', 'bigpotato'] },
-  { country: 'us',     keywords: ['wdym', 'what do you meme', 'hitster', 'kollide', 'feastables'] },
-  { country: 'global', keywords: ['lego', 'mattel', 'uno', 'hasbro', 'asmodee', 'ravensburger', 'naali', 'axel arigato'] },
-];
-
-function classifyCountry(brandName) {
-  const n = (brandName || '').toLowerCase();
-  for (const { country, keywords } of COUNTRY_RULES) {
-    if (keywords.some(kw => n.includes(kw))) return country;
-  }
-  return 'global';
-}
-
-function isOwnBrand(name) {
-  const n = (name || '').toLowerCase();
-  return OWN_BRAND_KEYWORDS.some(kw => n.includes(kw));
-}
-
-function isIrrelevant(name) {
-  const n = (name || '').toLowerCase();
-  return IRRELEVANT_KEYWORDS.some(kw => n.includes(kw));
-}
-
-// ─── Foreplay API ──────────────────────────────────────────────────────────────
-
-async function foreplayGet(path, params = {}) {
-  const url = new URL(FOREPLAY_BASE + path);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), {
-    headers: { 'Authorization': `Bearer ${FOREPLAY_API_KEY}` }
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Foreplay ${res.status} on ${path}: ${body}`);
-  }
-  return res.json();
-}
-
-async function getSpyderBrands() {
-  const pages = await Promise.all([
-    foreplayGet('/api/spyder/brands', { limit: 10, offset: 0 }),
-    foreplayGet('/api/spyder/brands', { limit: 10, offset: 10 }),
-    foreplayGet('/api/spyder/brands', { limit: 10, offset: 20 }),
-  ]);
-  return pages.flatMap(p => p.brands || p.data || p || []);
-}
-
-async function getBrandAds(brandId) {
-  const resp = await foreplayGet('/api/spyder/brand/ads', { brand_id: brandId, limit: 20, order: 'newest' });
-  return (resp.ads || resp.data || resp || []).map(ad => ({
-    id: ad.id,
-    format: ad.format || ad.ad_type || ad.type || 'Inconnu',
-    platforms: ad.platforms || [],
-    days_active: ad.days_active || ad.daysActive || 0,
-    start_date: ad.start_date || ad.startDate || null,
-    hook_text: ad.hook_text || ad.hookText || ad.caption || ad.text || ad.description || '',
-    img: ad.image_url || ad.imageUrl || ad.thumbnail_url || ad.thumbnailUrl || '',
-    url: ad.foreplay_url || `https://app.foreplay.co/discovery?ad=${ad.id}`,
-  }));
-}
 
 async function fetchAllData() {
   console.log('📡 Récupération des marques Foreplay Spyder...');
