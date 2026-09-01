@@ -229,6 +229,21 @@ function toIsoOrNull(epochMs) {
   return typeof epochMs === 'number' ? new Date(epochMs).toISOString() : null;
 }
 
+// Cascade héritée de l'ancien resolveLiveStatus (lib/foreplay-shared.mjs, pré-lot 1) :
+// l'API Foreplay n'a pas de champ "live" confirmé dans toutes ses réponses ; on tente
+// les noms de champs plausibles avant de retomber sur null ("statut inconnu") plutôt
+// que d'inventer une valeur. Ne pas réduire cette cascade à un simple test sur
+// rawAd.live : ça ferait régresser silencieusement le statut live affiché par
+// run-report.mjs (via getBrandAds, lib/foreplay-shared.mjs) pour toute pub dont le
+// statut n'arrive que sous is_active/isActive/status.
+function resolveLive(rawAd) {
+  if (typeof rawAd.live === 'boolean') return rawAd.live;
+  if (typeof rawAd.is_active === 'boolean') return rawAd.is_active;
+  if (typeof rawAd.isActive === 'boolean') return rawAd.isActive;
+  if (typeof rawAd.status === 'string') return rawAd.status.toLowerCase() === 'active';
+  return null;
+}
+
 export function normalizeAd(rawAd, rawBrand) {
   return {
     id: rawAd.id,
@@ -268,7 +283,7 @@ export function normalizeAd(rawAd, rawBrand) {
     languages: rawAd.languages ?? [],
     publisher_platform: rawAd.publisher_platform ?? [],
 
-    live: typeof rawAd.live === 'boolean' ? rawAd.live : null,
+    live: resolveLive(rawAd),
     // Choix explicite de la spec §2.1 : ?? 0, pas null. running_duration est présent sur
     // quasi toutes les pubs actives ; le garde-fou de qualité (metrics.nullLongevityRate,
     // Task 4) mesure le taux de running_days === 0 pour détecter une vraie régression.
