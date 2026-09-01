@@ -1,10 +1,10 @@
 // ATM Gaming — Rapport de veille concurrence hebdomadaire v2
 // Dashboard multi-pays avec section Mes Perfs ATM
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 
-const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
+const OPENAI_API_KEY     = process.env.OPENAI_API_KEY;
 const FOREPLAY_API_KEY   = process.env.FOREPLAY_API_KEY;
 const SLACK_BOT_TOKEN    = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL_ID   = 'C0BDJS75E04'; // #veille-concu-fr
@@ -224,7 +224,7 @@ async function fetchMetaData() {
 // ─── Analyse Claude ────────────────────────────────────────────────────────────
 
 async function analyzeWithClaude(data) {
-  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+  const client = new OpenAI({ apiKey: OPENAI_API_KEY, timeout: 300000 });
 
   const today = new Date();
   const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
@@ -430,14 +430,16 @@ Règles IMPORTANTES :
     required: ['adsCount', 'liveCount', 'brands', 'topAds', 'trends', 'creativeTests', 'recommendation']
   };
 
-  // Utiliser le streaming pour éviter le timeout sur les longues réponses (8 pays × analyse complète)
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
+  // Timeout client généreux pour éviter les coupures sur les longues réponses (8 pays × analyse complète)
+  const response = await client.chat.completions.create({
+    model: 'gpt-4.1',
     max_tokens: 28000,
     tools: [{
+      type: 'function',
+      function: {
       name: 'publish_veille',
       description: 'Publie l\'analyse de veille concurrence hebdomadaire structurée',
-      input_schema: {
+      parameters: {
         type: 'object',
         required: ['weekLabel', 'totalAds', 'activeBrands', 'globalInsights', 'countries', 'atm'],
         properties: {
@@ -495,22 +497,26 @@ Règles IMPORTANTES :
           }
         }
       }
+    }
     }],
-    tool_choice: { type: 'any' },
+    tool_choice: { type: 'function', function: { name: 'publish_veille' } },
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const message = await stream.finalMessage();
+  const choice = response.choices[0];
 
-  // Extract structured output from tool use (guaranteed valid JSON)
-  if (message.stop_reason === 'max_tokens') {
-    throw new Error('Claude a atteint la limite de tokens (max_tokens). Réduire les données envoyées.');
+  // Extract structured output from tool call (guaranteed valid JSON)
+  if (choice.finish_reason === 'length') {
+    throw new Error('OpenAI a atteint la limite de tokens (max_tokens). Réduire les données envoyées.');
   }
-  const toolUse = message.content.find(b => b.type === 'tool_use');
-  if (toolUse && toolUse.input && toolUse.input.countries) return toolUse.input;
+  const toolCall = choice.message.tool_calls?.find(c => c.function?.name === 'publish_veille');
+  if (toolCall) {
+    const parsed = JSON.parse(toolCall.function.arguments);
+    if (parsed.countries) return parsed;
+  }
 
   // Fallback: parse text response
-  let text = (message.content[0]?.text || '').trim();
+  let text = (choice.message.content || '').trim();
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   if (!text.startsWith('{')) {
     const match = text.match(/\{[\s\S]*\}/);
