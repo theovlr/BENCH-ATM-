@@ -77,13 +77,23 @@ async function fetchBenchmarkData() {
 function buildBenchmarkView(ads) {
   const competitorAds = ads.filter(ad => ad.in_scope === true && ad.owner === 'competitor');
 
+  // Compte par marché des pubs hors périmètre sectoriel (in_scope:false), tous
+  // owners confondus : c'est le compteur "N pubs hors périmètre masquées" affiché
+  // dans l'onglet Résumé (spec Task 7 point 3), distinct de l'axe ATM/concurrent.
+  const outOfScopeByMarket = {};
+  for (const ad of ads) {
+    if (ad.in_scope === false) {
+      outOfScopeByMarket[ad.market] = (outOfScopeByMarket[ad.market] || 0) + 1;
+    }
+  }
+
   // Regroupement par marché : { fr: { brands: [...] }, dach: { brands: [...] }, ... }
   const benchmark = {};
-  for (const market of MARKETS) benchmark[market] = { brands: [] };
+  for (const market of MARKETS) benchmark[market] = { brands: [], outOfScopeCount: outOfScopeByMarket[market] || 0 };
 
   for (const ad of competitorAds) {
     const market = ad.market;
-    if (!benchmark[market]) benchmark[market] = { brands: [] };
+    if (!benchmark[market]) benchmark[market] = { brands: [], outOfScopeCount: outOfScopeByMarket[market] || 0 };
     let brand = benchmark[market].brands.find(b => b.name === ad.brand_name);
     if (!brand) {
       brand = { name: ad.brand_name, market, ads: [] };
@@ -106,6 +116,17 @@ function buildBenchmarkView(ads) {
       b.ads.map(ad => ({ ...ad, brand: b.name, market })));
     flatAds.sort((a, b) => (b.live === true) - (a.live === true) || (b.days_active || 0) - (a.days_active || 0));
     benchmark[market].topPerformers = flatAds.slice(0, 8);
+  }
+
+  // Garantit une forme complète ({ brands, outOfScopeCount, topPerformers }) pour
+  // TOUT bucket présent dans benchmark, y compris les marchés hors MARKETS (ex:
+  // 'unclassified') créés ci-dessus par des pubs concurrentes en périmètre : sans
+  // ce filet, ces buckets ad-hoc n'auraient jamais de topPerformers, une forme
+  // incohérente dans data/benchmark-ugc-<date>.json. Ça n'ajoute aucun onglet
+  // visible : les onglets restent pilotés par MARKETS/MARKET_META (lot 3 pour
+  // exposer 'unclassified' dans l'UI).
+  for (const market of Object.keys(benchmark)) {
+    if (!benchmark[market].topPerformers) benchmark[market].topPerformers = [];
   }
 
   return benchmark;
@@ -513,6 +534,7 @@ function renderResume(D) {
     { val: brands.length, label: 'Marques suivies' },
     { val: liveCount, label: 'Pubs live' },
     { val: topPerformers.length, label: 'Top performers' },
+    { val: D.outOfScopeCount || 0, label: 'Pubs hors périmètre masquées' },
   ];
   const kpiHtml = kpis.map(k => \`<div class="kpi-card"><div class="kpi-value">\${k.val}</div><div class="kpi-label">\${k.label}</div></div>\`).join('');
   if (!brands.length) {
@@ -693,7 +715,7 @@ async function main() {
   const benchmark = buildBenchmarkView(ads);
   const totalAds = MARKETS.reduce((n, m) => n + (benchmark[m]?.brands || []).reduce((s, b) => s + b.ads.length, 0), 0);
   const maskedCount = ads.length - totalAds;
-  console.log(`  → ${totalAds} pubs concurrentes en périmètre pour le dashboard (${maskedCount} pubs hors périmètre ou marque ATM masquées de la vue "Pubs concurrentes")`);
+  console.log(`  → ${totalAds} pubs concurrentes en périmètre pour le dashboard (${maskedCount} pubs masquées de la vue "Pubs concurrentes" : hors périmètre, marque ATM, ou marché non classifié)`);
   if (totalAds === 0) throw new Error('Aucune donnée concurrente en périmètre pour le dashboard. Vérifie la classification in_scope/owner.');
 
   const client = new OpenAI({ apiKey: OPENAI_API_KEY, timeout: 300000 });
