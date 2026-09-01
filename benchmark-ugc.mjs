@@ -17,7 +17,7 @@ const ATM_CATALOG = [
   'Smash It', 'Play-Hit', 'Little Secret', 'Rank King', 'Osmooz', 'Intimoos',
 ];
 
-const MARKETS = ['fr', 'dach', 'uk', 'us', 'it', 'es', 'nl', 'global'];
+const MARKETS = ['fr', 'dach', 'uk', 'us', 'it', 'es', 'nl', 'global', 'unclassified'];
 
 // ─── Nettoyage texte (sécurité en plus de la consigne dans le prompt) ───────────
 
@@ -50,7 +50,7 @@ async function fetchBenchmarkData() {
   console.log(`  → ${allBrands.length} marques trouvées`);
 
   const results = await Promise.allSettled(allBrands.map(async brand => {
-    const rawAds = await getBrandAdsRaw(brand.id, { maxAds: 250 });
+    const rawAds = await getBrandAdsRaw(brand.id, { maxAds: Number(process.env.MAX_ADS_PER_BRAND) || 250 });
     const ads = rawAds
       .map(rawAd => normalizeAd(rawAd, brand))
       .map(ad => classifyAd(ad, brand, atmBrandsConfig));
@@ -357,6 +357,7 @@ function generateHTML(data) {
     es: { flag: '🇪🇸', name: 'Espagne', accent: '#ec4899' },
     nl: { flag: '🇳🇱', name: 'Pays-Bas', accent: '#06b6d4' },
     global: { flag: '🌍', name: 'Global', accent: '#8b5cf6' },
+    unclassified: { flag: '❓', name: 'Non classifié', accent: '#64748b' },
   };
 
   return `<!DOCTYPE html>

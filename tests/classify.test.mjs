@@ -98,3 +98,11 @@ test('classifyInScope garde la liste noire comme filet de sécurité', () => {
   );
   assert.equal(inScope, false);
 });
+
+test('classifyInScope accepte "Party Game" (singulier), pas seulement "games" au pluriel', () => {
+  const inScope = classifyInScope(
+    { niches: [], product_category: 'Party Game' },
+    { category: '', name: 'Olé Mains' }
+  );
+  assert.equal(inScope, true);
+});
