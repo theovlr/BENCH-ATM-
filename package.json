@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "benchmark:ugc": "node benchmark-ugc.mjs"
+    "benchmark:ugc": "node benchmark-ugc.mjs",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "openai": "^7.7.0"
