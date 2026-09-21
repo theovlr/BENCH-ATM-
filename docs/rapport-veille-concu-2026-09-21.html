@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATM Gaming — Dashboard Veille · 15 septembre – 21 septembre 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f1117;--surface:#1a1d29;--surface2:#252836;--surface3:#2e3347;--text:#e8eaf0;--muted:#9398a5;--border:#2e3347}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:inherit;text-decoration:none}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;background:#f59e0b;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:15px;font-weight:700}.logo-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.header-right{display:flex;align-items:center;gap:12px}
+.date-badge{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--muted)}
+.live-badge{background:#16a34a22;border:1px solid #16a34a55;color:#4ade80;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600}
+.country-tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.country-tabs::-webkit-scrollbar{display:none}
+.ctab{padding:13px 18px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:.2s;user-select:none}
+.ctab:hover{color:var(--text)}.ctab.active{color:var(--text);font-weight:600;border-bottom-color:var(--c-accent)}
+.sub-tabs{padding:16px 24px 0;display:flex;gap:4px;flex-wrap:wrap}
+.stab{padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:.2s;user-select:none}
+.stab:hover{color:var(--text)}.stab.active{background:var(--surface2);color:var(--text)}
+.content{padding:24px;max-width:1400px;margin:0 auto}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c-accent,#3b82f6)}
+.kpi-value{font-size:26px;font-weight:800;color:var(--text);margin-bottom:3px}.kpi-label{font-size:11px;color:var(--muted);font-weight:500}
+.kpi-delta{margin-top:7px;font-size:11px;font-weight:600}.kpi-delta.up{color:#4ade80}.kpi-delta.neutral{color:var(--muted)}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:22px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+.chart-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:14px}
+.chart-wrap{height:170px;position:relative}
+.brands-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin-bottom:22px}
+.brand-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:10px}
+.brand-name{font-size:13px;font-weight:600;margin-bottom:2px}.brand-meta{font-size:11px;color:var(--muted);margin-bottom:6px}
+.brand-tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2)}
+.tag.live{background:#16a34a22;color:#4ade80}.tag.hot{background:#ef444422;color:#f87171}.tag.nouveau{background:#3b82f622;color:#60a5fa}
+.ads-controls{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:5px 11px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:.2s}
+.filter-btn.active,.filter-btn:hover{background:var(--surface2);color:var(--text)}
+.ads-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.ad-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:.2s}
+.ad-card:hover{border-color:var(--c-accent);transform:translateY(-2px)}
+.ad-thumb{width:100%;height:150px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.ad-thumb img{width:100%;height:100%;object-fit:cover}
+.vplay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0006}
+.vplay-icon{width:38px;height:38px;background:#fff3;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ad-body{padding:11px}.ad-brand{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.ad-desc{font-size:12px;color:var(--text);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:7px}
+.ad-footer{display:flex;align-items:center;gap:6px}
+.ad-fmt{padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;background:var(--surface2);color:var(--muted)}
+.ad-days{font-size:10px;color:var(--muted)}.ad-live{width:5px;height:5px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.ad-link{font-size:10px;color:var(--c-accent,#3b82f6);margin-top:5px;display:block}
+.top-list{display:flex;flex-direction:column;gap:12px}
+.top-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:12px}
+.top-rank{font-size:22px;font-weight:800;color:var(--c-accent);min-width:32px;text-align:center}
+.top-img{width:72px;height:54px;border-radius:8px;object-fit:cover;background:var(--surface2);flex-shrink:0}
+.top-body{flex:1}.top-brand{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px}
+.top-hook{font-size:13px;color:var(--text);line-height:1.4;margin-bottom:6px}
+.top-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.trends-list{display:flex;flex-direction:column;gap:12px}
+.trend-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;gap:14px}
+.trend-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--surface2);flex-shrink:0}
+.trend-title{font-size:14px;font-weight:600;margin-bottom:5px}.trend-desc{font-size:12px;color:var(--muted);line-height:1.55}
+.trend-evidence{margin-top:7px;font-size:11px;color:var(--c-accent,#3b82f6);font-style:italic}
+.ab-badge{background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px}
+.reco-box{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--c-accent,#3b82f6);border-radius:0 12px 12px 0;padding:18px;margin-top:20px}
+.reco-title{font-size:13px;font-weight:700;margin-bottom:8px}.reco-content{font-size:12px;color:var(--muted);line-height:1.6}
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.section-head h2{font-size:15px;font-weight:700}
+.section-count{background:var(--surface2);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--muted)}
+.insight-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--c-accent,#3b82f6);border-radius:0 10px 10px 0;padding:14px;margin-bottom:14px}
+.insight-box h3{font-size:12px;font-weight:600;margin-bottom:5px}.insight-box p{font-size:11px;color:var(--muted);line-height:1.55}
+.demo-banner{background:linear-gradient(135deg,#78350f,#92400e);border:1px solid #d97706;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.demo-badge{background:#f59e0b;color:#0f1117;border-radius:5px;padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.5px;flex-shrink:0}
+.demo-text{font-size:12px;color:#fcd34d;line-height:1.5}
+.atm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.atm-kpi{background:var(--surface);border:1px solid var(--border);border-top:3px solid #f59e0b;border-radius:12px;padding:16px}
+.atm-kpi-val{font-size:24px;font-weight:800;color:#f59e0b}.atm-kpi-label{font-size:11px;color:var(--muted);margin-top:3px}
+.atm-kpi-note{font-size:10px;color:var(--muted);margin-top:5px;font-style:italic}
+.bullets{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.bullet{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5}
+@media(max-width:600px){.content{padding:14px}.ads-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🎲</div>
+    <div>
+      <div class="logo-text">ATM Gaming · Dashboard Veille</div>
+      <div class="logo-sub">Semaine du 15 septembre – 21 septembre 2026</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="date-badge">📅 lundi 21 septembre 2026</div>
+    <div class="live-badge">● LIVE</div>
+  </div>
+</div>
+
+<div class="country-tabs" id="countryTabs"><div class="ctab active" data-country="fr" onclick="switchCountry('fr')">🇫🇷 France <span style="opacity:.5;font-size:11px">24 pubs</span></div><div class="ctab " data-country="dach" onclick="switchCountry('dach')">🇩🇪 DACH <span style="opacity:.5;font-size:11px">12 pubs</span></div><div class="ctab " data-country="uk" onclick="switchCountry('uk')">🇬🇧 UK <span style="opacity:.5;font-size:11px">0 pubs</span></div><div class="ctab " data-country="us" onclick="switchCountry('us')">🇺🇸 US/EN <span style="opacity:.5;font-size:11px">12 pubs</span></div><div class="ctab " data-country="global" onclick="switchCountry('global')">🌍 Global <span style="opacity:.5;font-size:11px">24 pubs</span></div><div class="ctab " data-country="it" onclick="switchCountry('it')">🇮🇹 Italie <span style="opacity:.5;font-size:11px">16 pubs</span></div><div class="ctab " data-country="es" onclick="switchCountry('es')">🇪🇸 Espagne <span style="opacity:.5;font-size:11px">0 pubs</span></div><div class="ctab " data-country="nl" onclick="switchCountry('nl')">🇳🇱 Pays-Bas <span style="opacity:.5;font-size:11px">0 pubs</span></div><div class="ctab" data-country="atm" onclick="switchCountry('atm')">📊 Mes Perfs ATM <span style="opacity:.5;font-size:11px">30 pubs</span></div></div>
+
+<div class="sub-tabs" id="subTabs">
+  <button class="stab active" onclick="switchSubTab('resume')">📊 Résumé</button>
+  <button class="stab" onclick="switchSubTab('nouvelles')">🆕 Nouvelles Pubs</button>
+  <button class="stab" onclick="switchSubTab('top')">🏆 Top Pubs</button>
+  <button class="stab" onclick="switchSubTab('tendances')">📈 Tendances</button>
+  <button class="stab" onclick="switchSubTab('tests')">🧪 Tests Créatifs</button>
+</div>
+
+<div class="content" id="mainContent"></div>
+
+<script>
+const ANALYSIS = {"weekLabel":"15 septembre – 21 septembre 2026","totalAds":96,"activeBrands":16,"globalInsights":["🎯 96 publicités actives cette semaine sur 16 marques concurrentes — densité créative élevée à l'approche des fêtes","📹 La vidéo UGC / gameplay domine : +60% des pubs actives sont en format vidéo, tirées par SAVANA France, Bakakou et What Do You Meme?","🏷️ Le hook 'best-seller' est le pattern copywriting #1 cette semaine : Bakakou, Pili Pili Game et Speedbac l'utilisent simultanément","🌍 La rentrée de septembre génère une vague promotionnelle : Gigamic (1 jeu acheté = 2e à -50%), LEGO (cadeau à partir de 5700¥), Cranio Creations (bundles Essen 2026)","🎵 Le quiz musical comme mécanisme de jeu est un angle montant : Hitster Party (US) et Olé Mains (FR) misent toutes deux sur ce format"],"countries":{"fr":{"adsCount":24,"liveCount":24,"brands":[{"name":"Traitres à Bord - Le Jeu","adsCount":6,"liveCount":6,"formats":"DCO×3, IMAGE×3","topAngle":"Bluff & trahison avec IP One Piece","tags":["live","hot"]},{"name":"SAVANA France","adsCount":6,"liveCount":6,"formats":"VIDEO×6","topAngle":"Nouveau jeu 2 joueurs zen & compétitif","tags":["live","nouveau"]},{"name":"Bakakou","adsCount":6,"liveCount":6,"formats":"IMAGE×4, VIDEO×2","topAngle":"Best-seller social proof massif","tags":["live","hot"]},{"name":"Gigamic","adsCount":6,"liveCount":6,"formats":"IMAGE×5, VIDEO×1","topAngle":"Rentrée promo 1 acheté = 2e à -50%","tags":["live"]},{"name":"Olé Mains","adsCount":6,"liveCount":6,"formats":"IMAGE×5, DCO×1","topAngle":"Quiz musical familial & soirées","tags":["live","nouveau"]}],"topAds":[{"id":"NgyqQH9LCnU875d6utr8","brand":"Bakakou","format":"VIDEO","days":0,"hook":"💚 1 MILLION DE JOUEURS. MERCI ❤️","angle":"Preuve sociale massive 1M joueurs","img":"https://app.foreplay.co/discovery?ad=NgyqQH9LCnU875d6utr8","url":"https://app.foreplay.co/discovery?ad=NgyqQH9LCnU875d6utr8","live":true},{"id":"hvF32ZZWDWm4RVcAgwhH","brand":"Bakakou","format":"IMAGE","days":0,"hook":"Déjà un best-seller ! Il cartonne partout ! Qu'est-ce qui fait son succès ?","angle":"Curiosité + best-seller social proof","img":"https://app.foreplay.co/discovery?ad=hvF32ZZWDWm4RVcAgwhH","url":"https://app.foreplay.co/discovery?ad=hvF32ZZWDWm4RVcAgwhH","live":true},{"id":"Hj4iA2UKpJGvaQzB8WVM","brand":"Traitres à Bord - Le Jeu","format":"IMAGE","days":0,"hook":"Bluff et révélations entre amis! 🎭 Découvrez la magie de Traîtres à bord - One Piece! Qui parmi vo…","angle":"IP One Piece + bluff entre amis","img":"https://app.foreplay.co/discovery?ad=Hj4iA2UKpJGvaQzB8WVM","url":"https://app.foreplay.co/discovery?ad=Hj4iA2UKpJGvaQzB8WVM","live":true},{"id":"XHV3m9s4nXTjkiPcc5gD","brand":"SAVANA France","format":"VIDEO","days":0,"hook":"Un duel zen… mais sans pitié 😈 🪷 Trace une ligne, pose ton pion, cueille les fleurs… Mais attenti…","angle":"Tension duel paradoxal zen/compétitif","img":"https://app.foreplay.co/discovery?ad=XHV3m9s4nXTjkiPcc5gD","url":"https://app.foreplay.co/discovery?ad=XHV3m9s4nXTjkiPcc5gD","live":true}],"trends":[{"icon":"🏆","title":"La preuve sociale massive comme hook principal","desc":"Bakakou monopolise l'angle 'best-seller' avec 4 variantes image autour du même hook 'Il cartonne partout'. La mention '1 million de joueurs' en vidéo pousse l'autorité sociale à son maximum. Ce pattern génère de la curiosité immédiate et réduit l'hésitation à l'achat.","evidence":"Ads Bakakou : hvF32ZZWDWm4RVcAgwhH, 5G6ozum5nxfI0D3KT6PS, qe6EGloLMzeMdmUY3fQm, NgyqQH9LCnU875d6utr8"},{"icon":"🎵","title":"Le quiz musical s'impose comme mécanique de jeu tendance","desc":"Olé Mains lance DJ Set et NUTRUSH en simulant deux angles complémentaires : 'quiz musical familial' et 'jeu déjanté entre amis'. 5 images actives en simultané indiquent un test large de ciblages. Le format musical est une alternative directe aux jeux de cartes classiques.","evidence":"Ads Olé Mains : QvIvqeMzPmgcGOX8mS5T, szc31W7dYZe3F2VXNvtW, s0hauT7RtMxq8NbxxvHY, yh2h2iU8Bn3aZlvMNkk8, uQghokowp8mlvJHbDxgE"},{"icon":"🌸","title":"SAVANA France mise sur l'angle 'nouveau jeu boutique' avec contenu natif","desc":"6 vidéos consécutives autour de 'Lacuna' utilisent un format proche du contenu organique (hashtags, ambiance boutique ludique). L'angle 'duel zen mais sans pitié' crée une tension émotionnelle efficace. La stratégie de contenu UGC-style est cohérente et volumineuse.","evidence":"Ads SAVANA France : y2BfQ8BOnMiW6u3W7SpN, dKcPFgSzcksuCTqfqONO, XHV3m9s4nXTjkiPcc5gD, 2JFhzjzkWgE3dmkBwPoi, 1veuG6G3OsUyyqylEQcc"}],"creativeTests":[{"title":"Bakakou — Test hook 'best-seller' vs preuve sociale chiffrée","hook":"Mesure quelle version génère le plus de clics : la curiosité ('Qu'est-ce qui fait son succès ?') vs l'émotion ('1 MILLION DE JOUEURS')","count":5,"brand":"Bakakou"},{"title":"Gigamic — Test angle rentrée promo vs angle pédagogique","hook":"Teste si la promotion '1 jeu acheté = 2e à -50%' performe mieux que l'angle développement enfant ('développe la logique de ton enfant')","count":4,"brand":"Gigamic"},{"title":"Olé Mains — Test produit DJ Set vs NUTRUSH","hook":"Deux produits en simultané pour identifier lequel génère le meilleur CPA en phase de découverte","count":5,"brand":"Olé Mains"},{"title":"Suggestion A/B ATM — Speedbac : hook award vs hook 2 joueurs","hook":"Tester 'Grand Prix du Jouet 2024 — Noté 4,8/5' contre 'Enfin un jeu qui peut se jouer à 2 !' pour identifier l'argument le plus convertissant","count":2,"brand":"Speedbac"}],"recommendation":{"product":"Speedbac","format":"VIDEO","hook":"💚 + de 50 000 joueurs adorent Speedbac. Et si c'était toi le prochain à perdre en 10 secondes ? 😂⚡","inspiration":"Bakakou","priority":"Haute"}},"dach":{"adsCount":12,"liveCount":12,"brands":[{"name":"WePlay","adsCount":6,"liveCount":6,"formats":"VIDEO×6","topAngle":"Jouer ensemble avec ses amis","tags":["live"]},{"name":"YAQUA Spiele","adsCount":6,"liveCount":6,"formats":"VIDEO×6","topAngle":"Mashup jeux connus Crack List + TOTAL 10","tags":["live","hot"]}],"topAds":[{"id":"s7ZyZRbvr9vCRRZJxQxb","brand":"YAQUA Spiele","format":"VIDEO","days":0,"hook":"Stadt-Land-Fluss × UNO = Crack List. 🎲 Schnell erklärt. Lang gespielt. Immer wieder. Schnell gelief…","angle":"Mashup deux jeux connus = nouveau concept","img":"https://app.foreplay.co/discovery?ad=s7ZyZRbvr9vCRRZJxQxb","url":"https://app.foreplay.co/discovery?ad=s7ZyZRbvr9vCRRZJxQxb","live":true},{"id":"FwJvG3e4RURYwnjq1O7i","brand":"YAQUA Spiele","format":"VIDEO","days":0,"hook":"Du magst SKYJO®? Du wirst TOTAL 10 lieben 🔥 Klaue die Karten deiner Mitspieler. Erreiche zuerst 10…","angle":"Si tu aimes X, tu aimeras Y — référencement concurrent","img":"https://app.foreplay.co/discovery?ad=FwJvG3e4RURYwnjq1O7i","url":"https://app.foreplay.co/discovery?ad=FwJvG3e4RURYwnjq1O7i","live":true},{"id":"xSP7myIS7V8tzYOFbnGC","brand":"WePlay","format":"VIDEO","days":0,"hook":"Werin WePlayê, bi hevalên xwe re lîstika nû bilîzin!","angle":"Communauté & jeu entre amis","img":"https://app.foreplay.co/discovery?ad=xSP7myIS7V8tzYOFbnGC","url":"https://app.foreplay.co/discovery?ad=xSP7myIS7V8tzYOFbnGC","live":true},{"id":"QrZoG6viXt7g7J2uzIkS","brand":"YAQUA Spiele","format":"VIDEO","days":0,"hook":"Stadt Land Fluss + Uno = Crack List ✨ fonctionne à deux comme en famille…","angle":"Versatilité duo et famille","img":"https://app.foreplay.co/discovery?ad=QrZoG6viXt7g7J2uzIkS","url":"https://app.foreplay.co/discovery?ad=QrZoG6viXt7g7J2uzIkS","live":true}],"trends":[{"icon":"🔗","title":"Stratégie 'si tu aimes X, tu aimeras Y' — ancrage sur des marques établies","desc":"YAQUA Spiele utilise SKYJO et UNO comme références de comparaison pour positionner ses nouveaux jeux Crack List et TOTAL 10. Cette technique réduit le risque perçu et active la mémoire affective du joueur. 3 vidéos en simultané sur TOTAL 10 confirment l'investissement publicitaire.","evidence":"Ads YAQUA : s7ZyZRbvr9vCRRZJxQxb, UL4Eiv2G055GK7vBxnaC, QrZoG6viXt7g7J2uzIkS, FwJvG3e4RURYwnjq1O7i, q5cYySmrHRggb3g0YtCx, 791Zn5rzYnZkXSvKHhCk"},{"icon":"📹","title":"100% vidéo sur le marché DACH — format dominant sans exception","desc":"Les 12 pubs actives en DACH cette semaine sont toutes en format vidéo (WePlay 6×, YAQUA 6×). Aucune image ni carousel n'est testé. Cela indique une stratégie d'engagement social forte, probablement sur Reels/TikTok ads, pour maximiser la portée organique.","evidence":"Toutes les ads WePlay (xSP7myIS7V8tzYOFbnGC à bOO5JtzR2U2pswGToVIk) et YAQUA (s7ZyZRbvr9vCRRZJxQxb à 791Zn5rzYnZkXSvKHhCk)"},{"icon":"🎯","title":"Répétition de message identique comme stratégie de mémorisation forcée","desc":"WePlay diffuse 6 vidéos avec un hook quasi-identique ('Werin WePlayê, bi hevalên xwe re lîstika nû bilîzin!'). Cette répétition intensive vise la mémorisation de marque par fréquence plutôt que par variation créative — stratégie awareness pure.","evidence":"Ads WePlay : xSP7myIS7V8tzYOFbnGC, uKaq91gjxioyIzkfstFi, tNyZgIIyxZsGMdvBU4TT, irD4HVV8EtW8IaQkfquI, fyU0hMiaNRBFx1LuRKqP, bOO5JtzR2U2pswGToVIk"}],"creativeTests":[{"title":"YAQUA Spiele — Test Crack List vs TOTAL 10","hook":"Deux produits en simultané avec le même angle 'mashup de jeux connus' pour identifier lequel convertit mieux sur le marché DACH","count":6,"brand":"YAQUA Spiele"},{"title":"Suggestion A/B ATM — Pili Pili DACH : hook 'EXTRA SPICY' vs hook avis clients","hook":"Tester l'angle nouveauté/lancement ('EXTRA SPICY est arrivé!') contre l'angle UGC ('This game is so easy but so addictive! ⭐⭐⭐⭐⭐') pour le marché germanophone","count":2,"brand":"Pili Pili Game"}],"recommendation":{"product":"Pili Pili Game","format":"VIDEO","hook":"Du magst UNO? Du wirst Pili Pili lieben 🌶️🔥 Das schnellste und chaotischste Kartenspiel — einmal gespielt, nie mehr aufgehört!","inspiration":"YAQUA Spiele","priority":"Haute"}},"uk":{"adsCount":0,"liveCount":0,"brands":[],"topAds":[],"trends":[],"creativeTests":[{"title":"Suggestion A/B ATM — Quickstop UK : hook famille vs hook rapidité","hook":"Tester 'The fastest family card game' vs 'My kid can't stop laughing at this game ⭐⭐⭐⭐⭐' pour valider l'argument principal sur le marché UK","count":2,"brand":"Quickstop Game"},{"title":"Suggestion A/B ATM — Pili Pili UK : format image award vs vidéo UGC","hook":"Image statique avec badge 'Best Game 2026' contre une vidéo gameplay spontanée pour identifier le format le plus efficace en acquisition UK","count":2,"brand":"Pili Pili Game"}],"recommendation":{"product":"Pili Pili Game","format":"VIDEO","hook":"\"This game is so easy but so addictive!\" ⭐⭐⭐⭐⭐ Pili Pili Extra Spicy is the card game your family has been waiting for — now even more chaotic! 🌶️💥","inspiration":"Hitster Party","priority":"Moyenne"}},"us":{"adsCount":12,"liveCount":12,"brands":[{"name":"What Do You Meme?","adsCount":6,"liveCount":6,"formats":"IMAGE×2, VIDEO×4","topAngle":"Gameplay viral & moments de groupe","tags":["live","hot"]},{"name":"Hitster Party","adsCount":6,"liveCount":6,"formats":"VIDEO×4, CAROUSEL×1, IMAGE×1","topAngle":"Game night musique scan & quiz famille","tags":["live","nouveau"]}],"topAds":[{"id":"wIMZG1TE77nBAReXp15Q","brand":"Hitster Party","format":"VIDEO","days":0,"hook":"Game night just got louder! Spin, scan and test your music knowledge with Hitster Bingo. Available a…","angle":"Game night amplifié par la musique","img":"https://app.foreplay.co/discovery?ad=wIMZG1TE77nBAReXp15Q","url":"https://app.foreplay.co/discovery?ad=wIMZG1TE77nBAReXp15Q","live":true},{"id":"yokXZaw3aGMl7fTBpVjl","brand":"What Do You Meme?","format":"VIDEO","days":0,"hook":"Prime Day discounts are here! 🎉 Step 1: Score amazing games at a steal! Step 2: Gather your crew f…","angle":"Promo Prime Day + moment convivial","img":"https://app.foreplay.co/discovery?ad=yokXZaw3aGMl7fTBpVjl","url":"https://app.foreplay.co/discovery?ad=yokXZaw3aGMl7fTBpVjl","live":true},{"id":"sdnw9fP4fHwyBPUT5scX","brand":"What Do You Meme?","format":"VIDEO","days":0,"hook":"Warning: Kollide will start arguments about rematches. It's the magnetic strategy game that puts yo…","angle":"Avertissement humoristique + addiction au jeu","img":"https://app.foreplay.co/discovery?ad=sdnw9fP4fHwyBPUT5scX","url":"https://app.foreplay.co/discovery?ad=sdnw9fP4fHwyBPUT5scX","live":true},{"id":"4JiSaPVIdKPhf3yH1MZ9","brand":"Hitster Party","format":"VIDEO","days":0,"hook":"HITSTER MUSIC BINGO had the whole family playing 🎶✍🏻 Our family played the NEW party game…","angle":"UGC famille — témoignage game night","img":"https://app.foreplay.co/discovery?ad=4JiSaPVIdKPhf3yH1MZ9","url":"https://app.foreplay.co/discovery?ad=4JiSaPVIdKPhf3yH1MZ9","live":true}],"trends":[{"icon":"🎵","title":"Le game night musical comme angle d'entrée dominant sur le marché US","desc":"Hitster Party positionne Hitster Bingo comme l'upgrade du 'game night' familial avec le hook 'just got louder'. 4 vidéos dont 2 UGC famille en simultané. L'angle 'scan & play' hybride digital/physique est différenciant et moderne.","evidence":"Ads Hitster : wIMZG1TE77nBAReXp15Q, hTIUzX2vyRNWq0sDe3tX, 4JiSaPVIdKPhf3yH1MZ9, pURpj0CUyilmMRLZ0Mfk, zwQRNPb4s2BWA19zD3oy"},{"icon":"😂","title":"L'humour et la tension sociale comme moteurs d'engagement pour What Do You Meme?","desc":"What Do You Meme? utilise des hooks basés sur la tension sociale ('Kollide will start arguments about rematches', 'WAIT FOR THE END'). 4 vidéos sur 6 utilisent ce registre. L'intégration avec @relatable (créateur viral) amplifie la portée organique.","evidence":"Ads WDYM : sdnw9fP4fHwyBPUT5scX, uY3gqedbvNDlqXJAwLOb, yVZjAMSxaVLCLJO86djy, yokXZaw3aGMl7fTBpVjl"},{"icon":"📦","title":"L'activation promotionnelle Prime Day comme levier court terme","desc":"What Do You Meme? capitalise sur l'événement Prime Day avec un hook en 2 étapes ('Step 1 / Step 2') qui guide l'action d'achat. Ce type de mécanique narrative structurée est efficace pour générer des conversions immédiates en période promotionnelle.","evidence":"Ad WDYM : yokXZaw3aGMl7fTBpVjl"}],"creativeTests":[{"title":"Hitster Party — Test UGC famille vs message produit direct","hook":"Compare la performance de témoignages famille authentiques ('had the whole family playing') contre un message produit structuré ('Spin, scan and test your music knowledge')","count":4,"brand":"Hitster Party"},{"title":"What Do You Meme? — Test hook avertissement vs hook humour viral","hook":"Mesure si 'Warning: Kollide will start arguments' performe mieux que 'WAIT FOR THE END 🤣' — tension vs surprise comique","count":3,"brand":"What Do You Meme?"}],"recommendation":{"product":"Quickstop Game","format":"VIDEO","hook":"Warning: Quickstop will cause uncontrollable laughter and endless rematches 😂⚡ The fastest family card game you'll ever play — try to stop if you can!","inspiration":"What Do You Meme?","priority":"Haute"}},"global":{"adsCount":24,"liveCount":24,"brands":[{"name":"LEGO","adsCount":6,"liveCount":6,"formats":"VIDEO×2, DCO×3, IMAGE×1","topAngle":"Programme de points & LEGO Pokémon SMART","tags":["live","hot"]},{"name":"UNO","adsCount":6,"liveCount":6,"formats":"IMAGE×1, DCO×2, CAROUSEL×1, VIDEO×2","topAngle":"Collab Billie Eilish & moments de plage","tags":["live","nouveau"]},{"name":"Asmodee UK","adsCount":6,"liveCount":6,"formats":"VIDEO×2, CAROUSEL×4","topAngle":"Azul Kids — pédagogie & pensée tactique","tags":["live"]},{"name":"Giochi Uniti","adsCount":6,"liveCount":6,"formats":"VIDEO×5, CAROUSEL×1","topAngle":"Escape room & aventure narrative immersive","tags":["live"]}],"topAds":[{"id":"Ul8b55a9yXMGBNkf8JEn","brand":"UNO","format":"IMAGE","days":0,"hook":"Hit 'em hard (not soft) with the Wild Card. UNO Canvas @billieeilish is available now at MattelCreat…","angle":"Collab célébrité culture pop — Billie Eilish","img":"https://app.foreplay.co/discovery?ad=Ul8b55a9yXMGBNkf8JEn","url":"https://app.foreplay.co/discovery?ad=Ul8b55a9yXMGBNkf8JEn","live":true},{"id":"q75pUrEPaOdjU5kh9ymC","brand":"Asmodee UK","format":"VIDEO","days":0,"hook":"Create patterns and develop tactical thinking with Azul Kids! The award-winning game reimagined.","angle":"Jeu éducatif primé réinventé pour enfants","img":"https://app.foreplay.co/discovery?ad=q75pUrEPaOdjU5kh9ymC","url":"https://app.foreplay.co/discovery?ad=q75pUrEPaOdjU5kh9ymC","live":true},{"id":"zXoHbnT98S5Y5Xd0vtty","brand":"LEGO","format":"VIDEO","days":0,"hook":"Scan new or existing LEGO® sets to earn points toward your next build.","angle":"Programme de fidélité gamifié","img":"https://app.foreplay.co/discovery?ad=zXoHbnT98S5Y5Xd0vtty","url":"https://app.foreplay.co/discovery?ad=zXoHbnT98S5Y5Xd0vtty","live":true},{"id":"uoeCk0qahknoVOgpXqK4","brand":"Giochi Uniti","format":"VIDEO","days":0,"hook":"Amanti delle escape room? Questa è la vostra sfida. Con EXIT – Il gioco di fuga, vivi un'esperienza…","angle":"Escape room à domicile — défi immersif","img":"https://app.foreplay.co/discovery?ad=uoeCk0qahknoVOgpXqK4","url":"https://app.foreplay.co/discovery?ad=uoeCk0qahknoVOgpXqK4","live":true}],"trends":[{"icon":"🌟","title":"Les collaborations IP & célébrités comme accélérateur de désirabilité","desc":"UNO x Billie Eilish et LEGO Pokémon SMART sont les deux exemples marquants de la semaine. Ces collaborations transforment un jeu classique en objet de collection désirable. Le hook de UNO ('Hit 'em hard (not soft)') emprunte le registre de la pop culture pour parler à une audience jeune.","evidence":"Ads UNO : Ul8b55a9yXMGBNkf8JEn ; LEGO : xn860Gc81IYt9ev4nm9x"},{"icon":"🧩","title":"L'angle éducatif/développement de l'enfant comme argument de vente premium","desc":"Asmodee UK mise sur 'tactical thinking' et 'award-winning' pour Azul Kids — un positionnement premium qui justifie le prix. 2 vidéos identiques et 4 carousels montrent une phase de scaling sur un message validé. Ce pattern est à reproduire pour Quickstop Family.","evidence":"Ads Asmodee UK : q75pUrEPaOdjU5kh9ymC, m5drZlNycCBS1POpWfZn, nVZilTXGMlnuwHQYoiGq, eua8rpbwofq2OjXXT33v, WaNFHse2lSLTMGiTDBRo, SjKpMJYq6MK37fDlk2Pa"},{"icon":"🔍","title":"L'escape room et la narration immersive comme nouveau standard du jeu adulte","desc":"Giochi Uniti consacre 5 vidéos à des jeux d'évasion et d'enquête (EXIT, escape room). L'angle 'E se potessi entrare in un giallo senza uscire di casa?' est particulièrement fort — il vend une expérience, pas un produit. Tendance applicable à JUMO.","evidence":"Ads Giochi Uniti : uoeCk0qahknoVOgpXqK4, ZyseCwMsGgPAeN5FXaGX, zDrMTbXrbh00Xq2XnkkC, OT8fDR69o5ZIYdJwiCSi"}],"creativeTests":[{"title":"Asmodee UK — Test scaling vidéo identique x2 + carousel x4","hook":"Valide si la répétition d'une même vidéo avec des audiences différentes performe mieux que la diversification créative — stratégie de scaling horizontal","count":6,"brand":"Asmodee UK"},{"title":"LEGO — Test programme fidélité vs LEGO Pokémon SMART Play","hook":"Deux angles produit radicalement différents en simultané : engagement long terme (points de fidélité) vs nouveauté interactive (Pokémon SMART) — test de priorité produit","count":6,"brand":"LEGO"},{"title":"Suggestion A/B ATM — Quickstop : angle éducatif vs angle familial","hook":"Tester 'Développe la concentration et la rapidité de ton enfant' contre 'Le jeu que toute la famille réclame chaque soir' pour identifier l'angle le plus porteur globalement","count":2,"brand":"Quickstop Game"},{"title":"Suggestion A/B ATM — JUMO : angle expérience immersive vs angle convivialité","hook":"Tester un angle narratif 'Entre dans une aventure sans quitter le salon' contre un angle social 'Le jeu qui crée des moments inoubliables entre amis'","count":2,"brand":"JUMO"}],"recommendation":{"product":"Quickstop Family","format":"VIDEO","hook":"🏆 Le jeu primé qui développe la rapidité et la logique de tes enfants — tout en rendant le game night inoubliable ! Quickstop Family, aussi fun à 2 qu'à 8.","inspiration":"Asmodee UK","priority":"Haute"}},"it":{"adsCount":16,"liveCount":16,"brands":[{"name":"Ghenos Games","adsCount":4,"liveCount":4,"formats":"VIDEO×2, CAROUSEL×1, VIDEO×1","topAngle":"Aperçu annonce nouveautés (Medium, Flower Fields)","tags":["live","nouveau"]},{"name":"Cranio Creations - Global","adsCount":6,"liveCount":6,"formats":"IMAGE×2, DCO×2, CAROUSEL×1, VIDEO×1","topAngle":"Bundles Essen 2026 & concours BoardGameGeek","tags":["live"]},{"name":"Io sono te","adsCount":6,"liveCount":6,"formats":"VIDEO×6","topAngle":"Connexion intime & questions profondes couple","tags":["live","hot"]}],"topAds":[{"id":"kzd9Z2ojMFF6OKF0TksG","brand":"Io sono te","format":"VIDEO","days":0,"hook":"Non serve un'occasione speciale per iniziare a conoscersi sul serio: basta la domanda giusta al mome…","angle":"Connexion émotionnelle — question au bon moment","img":"https://app.foreplay.co/discovery?ad=kzd9Z2ojMFF6OKF0TksG","url":"https://app.foreplay.co/discovery?ad=kzd9Z2ojMFF6OKF0TksG","live":true},{"id":"SdvfRUkZAH33aV8AP1Ao","brand":"Ghenos Games","format":"VIDEO","days":0,"hook":"Avete mai letto nella mente dei vostri amici? Presto potrete provarci. Sta per arrivare Medium, il…","angle":"Teaser mystérieux — anticipation nouveauté","img":"https://app.foreplay.co/discovery?ad=SdvfRUkZAH33aV8AP1Ao","url":"https://app.foreplay.co/discovery?ad=SdvfRUkZAH33aV8AP1Ao","live":true},{"id":"ZVdEQ1XAOdmLJobwQi1V","brand":"Cranio Creations - Global","format":"IMAGE","days":0,"hook":"Save up some money with our Essen 2026 bundles","angle":"Bundle événementiel Essen 2026","img":"https://app.foreplay.co/discovery?ad=ZVdEQ1XAOdmLJobwQi1V","url":"https://app.foreplay.co/discovery?ad=ZVdEQ1XAOdmLJobwQi1V","live":true},{"id":"9JLmWYseVCFa1qkYo9GJ","brand":"Ghenos Games","format":"VIDEO","days":0,"hook":"🌼 A novembre arriva Flower Fields! Avvincente gioco competitivo di piazzamento tessere, dove il vo…","angle":"Annonce lancement novembre — anticipation","img":"https://app.foreplay.co/discovery?ad=9JLmWYseVCFa1qkYo9GJ","url":"https://app.foreplay.co/discovery?ad=9JLmWYseVCFa1qkYo9GJ","live":true}],"trends":[{"icon":"❤️","title":"Le jeu comme outil de connexion émotionnelle — segment couple & amis proches","desc":"Io sono te consacre 6 vidéos à l'angle 'se connaître vraiment' et 'Amarsi significa continuare a scoprirsi'. Ce positionnement transforme le jeu en rituel intime. La répétition du même message avec de légères variations teste l'accroche optimale.","evidence":"Ads Io sono te : kzd9Z2ojMFF6OKF0TksG, PX7QuyxAlhR3jsdDQS5V, l1yQVHBd1aGTAj5guutX, RkTU1nJHn8KBR6qCMo0d, IQmCYwyRSJHZhNrnUojj, 4KpoI1y507uAnpBsq6j3"},{"icon":"🎪","title":"L'Essen Spiel 2026 comme levier événementiel de vente anticipée","desc":"Cranio Creations active des bundles promotionnels et un concours sur BoardGameGeek en lien avec l'Essen Spiel 2026. C'est un signal fort : les éditeurs utilisent ce salon comme déclencheur de vente précommande, avec une urgence naturelle.","evidence":"Ads Cranio : ZVdEQ1XAOdmLJobwQi1V, xIrO4RHkT0GVHVSauBya, mDDHFigukaRhUx6TcNZx"},{"icon":"👁️","title":"La stratégie teaser pré-lancement pour créer de l'anticipation","desc":"Ghenos Games annonce Medium et Flower Fields (novembre) via des teasers vidéo ('Presto potrete provarci', 'A novembre arriva'). Cette stratégie génère de l'attention avant la disponibilité produit et réduit le coût d'acquisition au lancement.","evidence":"Ads Ghenos : SdvfRUkZAH33aV8AP1Ao, 9JLmWYseVCFa1qkYo9GJ"}],"creativeTests":[{"title":"Io sono te — Test angle 'question au bon moment' vs angle 'vivre connectés mais pas vraiment'","hook":"Compare l'accroche émotionnelle directe contre une accroche sociétale ('Viviamo sempre connessi. Ma quanto tempo dedichiamo davvero a guardarci negli occhi?') — profondeur vs accessibilité","count":6,"brand":"Io sono te"},{"title":"Suggestion A/B ATM — Little Secret IT : angle révélations entre amis vs angle couple","hook":"Tester si le positionnement 'soirée amis / révélations' ou 'jeu de couple / connexion intime' génère le meilleur CPA sur le marché italien","count":2,"brand":"Little Secret"}],"recommendation":{"product":"Little Secret","format":"VIDEO","hook":"Non serve un'occasione speciale per scoprire davvero chi sono i tuoi amici. Basta una carta Little Secret 🤫 — il gioco delle rivelazioni che non ti aspetti.","inspiration":"Io sono te","priority":"Haute"}},"es":{"adsCount":0,"liveCount":0,"brands":[],"topAds":[],"trends":[],"creativeTests":[{"title":"Suggestion A/B ATM — Speedbac ES : hook prix / award vs hook humour","hook":"Tester 'Premio al mejor juego 2024 ⚡ — El mejor Bac del mundo' contre un hook humoristique de jeu rapide pour identifier le registre préféré du marché espagnol","count":2,"brand":"Speedbac"},{"title":"Suggestion A/B ATM — Pili Pili ES : vidéo UGC vs image produit","hook":"Comparer une vidéo gameplay authentique famille contre une image produit avec avis 5 étoiles pour valider le format le plus efficace en Espagne","count":2,"brand":"Pili Pili Game"}],"recommendation":{"product":"Speedbac","format":"VIDEO","hook":"¿Conoces el Bac? 🔥 Speedbac es la versión rápida, caótica y adictiva que toda la familia va a querer jugar una y otra vez — ¡imposible parar! ⚡","inspiration":"YAQUA Spiele","priority":"Moyenne"}},"nl":{"adsCount":0,"liveCount":0,"brands":[],"topAds":[],"trends":[],"creativeTests":[{"title":"Suggestion A/B ATM — Pili Pili NL : hook famille vs hook amis soirée","hook":"Tester si l'angle 'spelletjesavond met het gezin' (soirée jeux en famille) performe mieux que 'het meest verslavende kaartspel voor je vrienden' sur le marché néerlandais","count":2,"brand":"Pili Pili Game"},{"title":"Suggestion A/B ATM — Quickstop NL : image produit simple vs vidéo démonstration","hook":"Valider si une démo vidéo rapide du gameplay 30 secondes convertit mieux qu'une image produit avec social proof pour un nouveau marché","count":2,"brand":"Quickstop Game"}],"recommendation":{"product":"Pili Pili Game","format":"IMAGE","hook":"🌶️ Al meer dan 50.000 gezinnen spelen Pili Pili! Het kaartspel dat iedereen wil blijven spelen — nu ook in EXTRA SPICY versie!","inspiration":"Bakakou","priority":"Basse"}}},"atm":{"totalAds":30,"liveAds":30,"brands":[{"name":"Pili Pili Game","adsCount":10,"liveCount":10,"market":"🌍 International","formats":"VIDEO×7, IMAGE×1, DCO×2","topAngle":"Lancement EXTRA SPICY — meilleur jeu 2026","tags":["live","hot","nouveau"]},{"name":"Quickstop Game","adsCount":10,"liveCount":10,"market":"🌍 International","formats":"IMAGE×2, VIDEO×1, DCO×7","topAngle":"Jeu famille facile et addictif — avis 5 étoiles","tags":["live"]},{"name":"Speedbac - jeu petit bac","adsCount":10,"liveCount":10,"market":"🇫🇷 France","formats":"IMAGE×8, DCO×2","topAngle":"Grand Prix du Jouet 2024 — noté 4,8/5","tags":["live"]}],"topAds":[{"id":"GKauR5iSizxa5OeKJcgE","brand":"Pili Pili Game","format":"IMAGE","days":0,"hook":"NEW! PILI PILI EXTRA SPICY🌶💥 The best game of 2026 is back in an even more fun & chaotic version!","img":"https://app.foreplay.co/discovery?ad=GKauR5iSizxa5OeKJcgE","url":"https://app.foreplay.co/discovery?ad=GKauR5iSizxa5OeKJcgE","live":true},{"id":"tolSvPNrYtiTmbppUzlw","brand":"Pili Pili Game","format":"VIDEO","days":0,"hook":"\"This game is so easy but so addictive!\" ⭐⭐⭐⭐⭐ Pili Pili is the ideal family game that you just can…","img":"https://app.foreplay.co/discovery?ad=tolSvPNrYtiTmbppUzlw","url":"https://app.foreplay.co/discovery?ad=tolSvPNrYtiTmbppUzlw","live":true},{"id":"6Qazvs2y02hSi2zjmT3N","brand":"Speedbac - jeu petit bac","format":"IMAGE","days":0,"hook":"SPEEDBAC ⚡ Le petit bac en rapide et délirant 🌶️ Grand Prix du Jouet 2024 🏆 Noté 4,8/5 ⭐ sur + de…","img":"https://app.foreplay.co/discovery?ad=6Qazvs2y02hSi2zjwT3N","url":"https://app.foreplay.co/discovery?ad=6Qazvs2y02hSi2zjmT3N","live":true},{"id":"xVcDq3Px350LXB4w9ZyI","brand":"Quickstop Game","format":"IMAGE","days":0,"hook":"\"My kid just can't stop laughing at this game!\" ⭐⭐⭐⭐⭐ Quickstop Kids is the family game where the c…","img":"https://app.foreplay.co/discovery?ad=xVcDq3Px350LXB4w9ZyI","url":"https://app.foreplay.co/discovery?ad=xVcDq3Px350LXB4w9ZyI","live":true}],"insights":[{"icon":"🌶️","title":"Pili Pili Extra Spicy : lancement massif avec 7 vidéos actives simultanément","desc":"La stratégie de lancement de Pili Pili Extra Spicy est très agressive : 7 vidéos + 1 image + 2 DCO actifs en simultané. Le hook 'The best game of 2026 is back in an even more fun & chaotic version' capitalise sur la notoriété de la V1. La déclinaison 'so easy but so addictive' cible un angle UGC témoignage efficace. Recommandation : tester un hook vidéo en français pour le marché FR.","evidence":"Pili Pili ads : GKauR5iSizxa5OeKJcgE, zscYymtsu2vH7I7bgjPG, tolSvPNrYtiTmbppUzlw, slwStlwZX6lFqlyVTPhk, pxco5ZXJLH3Mf5A8ECFy, pOh53mJGl7f9xN9z2eLU, fFyJl9vUEE38qgZvBTC6, eB8ZkQ4GBJ5eZFwqEup9"},{"icon":"🖼️","title":"Speedbac sur-indexe en format image statique — gap vidéo à combler en urgence","desc":"Speedbac diffuse 8 images sur 10 pubs actives, avec seulement 2 DCO et aucune vidéo. Alors que la concurrence FR (SAVANA France : 100% vidéo, Bakakou : 2 vidéos sur 6) mise massivement sur la vidéo, Speedbac est à risque de faible engagement. Le hook 'Grand Prix du Jouet 2024' est fort mais sous-exploité en format vidéo.","evidence":"Speedbac ads image : v8Ys7RqBwhHqCNa0tmmn, 6Qazvs2y02hSi2zjmT3N, 6ycg27jKLVaPwsTzDiwV, Z07jXn8Uy9a5DZSZx6fM, GqF5pSMUixHlyY0qIOkO, 9QKYBTuedkLEVEU6TeVU, 3LlwFNAc3UZzxL30UUlK"},{"icon":"🤖","title":"Quickstop sur-indexe en DCO (70%) — signe d'optimisation algorithmique mais faible contrôle créatif","desc":"7 DCO sur 10 pubs Quickstop signifient que l'algorithme Meta pilote l'essentiel de la création. C'est efficace pour l'optimisation du CPA mais cela limite la différenciation créative face à des concurrents comme Hitster Party (contenu UGC humain). Recommandation : produire 2-3 vidéos UGC famille pour enrichir le pool créatif.","evidence":"Quickstop DCO ads : nKje8K8zUKV5aqynbEsn, khVSVZbm7dpTIEhKwZG1, WfwG86fFiSxOvmIzCgiU, Dmv1IdA1KBoheCNkW32g, 3bFY0Tpu8TtG5o9SsRIA, xZ545sute3WwWIwllqaZ, lb4VMF3Lz5yKmZVl4fuM"}]}};
+const C_META = {
+  global:{flag:'🌍',name:'Global',accent:'#8b5cf6'},
+  fr:{flag:'🇫🇷',name:'France',accent:'#3b82f6'},
+  dach:{flag:'🇩🇪',name:'DACH',accent:'#ef4444'},
+  uk:{flag:'🇬🇧',name:'UK',accent:'#f97316'},
+  us:{flag:'🇺🇸',name:'US/EN',accent:'#10b981'},
+  atm:{flag:'📊',name:'ATM Gaming',accent:'#f59e0b'}
+};
+const MEDALS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
+
+let currentCountry = 'global';
+let currentSubTab = 'resume';
+let adFilterBrand = 'all';
+const charts = {};
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => c && c.destroy());
+  Object.keys(charts).forEach(k => delete charts[k]);
+}
+
+function getAccent() { return C_META[currentCountry]?.accent || '#3b82f6'; }
+
+function switchCountry(c) {
+  currentCountry = c;
+  currentSubTab = 'resume';
+  adFilterBrand = 'all';
+  document.querySelectorAll('.ctab').forEach(t => t.classList.toggle('active', t.dataset.country === c));
+  const accent = getAccent();
+  document.querySelectorAll('.ctab.active').forEach(t => t.style.setProperty('--c-accent', accent));
+  document.getElementById('mainContent').style.setProperty('--c-accent', accent);
+  const st = document.getElementById('subTabs');
+  st.style.display = c === 'atm' ? 'none' : 'flex';
+  document.querySelectorAll('.stab').forEach((t, i) => t.classList.toggle('active', i === 0));
+  destroyCharts();
+  if (c === 'atm') renderATM();
+  else render();
+}
+
+function switchSubTab(tab) {
+  currentSubTab = tab;
+  const order = ['resume','nouvelles','top','tendances','tests'];
+  document.querySelectorAll('.stab').forEach((t, i) => t.classList.toggle('active', order[i] === tab));
+  destroyCharts();
+  render();
+}
+
+function render() {
+  const D = ANALYSIS.countries[currentCountry];
+  if (!D) return;
+  const mc = document.getElementById('mainContent');
+  mc.style.setProperty('--c-accent', getAccent());
+  switch(currentSubTab) {
+    case 'resume':    mc.innerHTML = renderResume(D); initCharts(D); break;
+    case 'nouvelles': mc.innerHTML = renderNouvelles(D); break;
+    case 'top':       mc.innerHTML = renderTop(D); break;
+    case 'tendances': mc.innerHTML = renderTendances(D); break;
+    case 'tests':     mc.innerHTML = renderTests(D); break;
+  }
+}
+
+// ── RÉSUMÉ ──────────────────────────────────────────────────────────
+function renderResume(D) {
+  const accent = getAccent();
+  const cm = C_META[currentCountry];
+  const kpis = [
+    { val: D.adsCount||0, label: 'Pubs détectées', delta: (D.brands||[]).length+' marques', dir:'neutral' },
+    { val: D.liveCount||0, label: 'Pubs live', delta: Math.round(((D.liveCount||0)/(D.adsCount||1))*100)+'% taux live', dir:'up' },
+    { val: (D.topAds||[]).filter(a=>a.live).length, label: 'Top ads actives', delta: 'dernière semaine', dir:'neutral' },
+    { val: (D.creativeTests||[]).length, label: 'Tests A/B détectés', delta: 'minimum 3 requis', dir:'neutral' },
+  ];
+  const kpiHtml = kpis.map(k => `<div class="kpi-card"><div class="kpi-value">${k.val}</div><div class="kpi-label">${k.label}</div><div class="kpi-delta ${k.dir}">${k.dir==='up'?'↑':'·'} ${k.delta}</div></div>`).join('');
+  const brandsHtml = (D.brands||[]).slice(0,6).map(b => `
+    <div class="brand-card">
+      <div class="brand-info" style="flex:1">
+        <div class="brand-name">${b.name}</div>
+        <div class="brand-meta">${b.adsCount||0} pubs · ${b.liveCount||0} live · ${b.formats||''}</div>
+        <div class="brand-meta" style="margin-top:2px">${b.topAngle||''}</div>
+        <div class="brand-tags">${(b.tags||[]).map(t=>`<span class="tag ${t}">${t==='live'?'● Live':t==='hot'?'🔥 Hot':'✨ Nouveau'}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="section-head"><h2>${cm.flag} Résumé — ${ANALYSIS.weekLabel}</h2></div>
+    <div class="kpi-grid">${kpiHtml}</div>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Formats</div><div class="chart-wrap"><canvas id="cFormats"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Activité par marque</div><div class="chart-wrap"><canvas id="cBrands"></canvas></div></div>
+    </div>
+    <div class="section-head"><h2>Marques surveillées</h2><span class="section-count">${(D.brands||[]).length}</span></div>
+    <div class="brands-grid">${brandsHtml}</div>`;
+}
+
+function initCharts(D) {
+  const accent = getAccent();
+  const gray = 'rgba(255,255,255,0.1)';
+  const ads = D.topAds || [];
+  const fmts = {}, brands = {};
+  ads.forEach(ad => {
+    fmts[ad.format] = (fmts[ad.format]||0)+1;
+    brands[ad.brand] = (brands[ad.brand]||0)+1;
+  });
+  const pal = [accent,'#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4'];
+  const fc = document.getElementById('cFormats');
+  if (fc) {
+    charts.formats = new Chart(fc, {
+      type:'doughnut',
+      data:{labels:Object.keys(fmts),datasets:[{data:Object.values(fmts),backgroundColor:pal,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#9398a5',font:{size:10}}}}}
+    });
+  }
+  const bc = document.getElementById('cBrands');
+  if (bc) {
+    const bArr = Object.entries(brands).sort((a,b)=>b[1]-a[1]);
+    charts.brands = new Chart(bc, {
+      type:'bar',
+      data:{labels:bArr.map(e=>e[0].split(' ')[0]),datasets:[{data:bArr.map(e=>e[1]),backgroundColor:accent+'aa',borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9398a5',font:{size:9}},grid:{color:gray}},y:{ticks:{color:'#9398a5',font:{size:9}},grid:{color:gray}}}}
+    });
+  }
+}
+
+// ── NOUVELLES PUBS ───────────────────────────────────────────────────
+function renderNouvelles(D) {
+  const ads = D.topAds || [];
+  const brands = [...new Set(ads.map(a=>a.brand))];
+  const filterHtml = `<span style="font-size:11px;color:var(--muted)">Marque:</span>
+    <button class="filter-btn active" onclick="setAdFilter('all',this)">Toutes</button>
+    ${brands.map(b=>`<button class="filter-btn" onclick="setAdFilter('${b.replace(/'/g,'').replace(/[^\w]/g,'_')}',this)" data-brand="${b}">${b.split(' ')[0]}</button>`).join('')}`;
+  const adsHtml = ads.map(ad => adCard(ad)).join('');
+  return `
+    <div class="section-head"><h2>Pubs de la semaine</h2><span class="section-count">${ads.length} ads</span></div>
+    <div class="ads-controls">${filterHtml}</div>
+    <div class="ads-grid" id="adsGrid">${adsHtml}</div>`;
+}
+
+window.setAdFilter = function(f, el) {
+  adFilterBrand = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const D = ANALYSIS.countries[currentCountry];
+  const ads = (D?.topAds||[]).filter(ad => f==='all' || ad.brand.replace(/'/g,'').replace(/[^\w]/g,'_')===f || ad.brand.split(' ')[0]===f);
+  document.getElementById('adsGrid').innerHTML = ads.map(ad=>adCard(ad)).join('');
+};
+
+// ── TOP PUBS ─────────────────────────────────────────────────────────
+function renderTop(D) {
+  const ads = [...(D.topAds||[])].sort((a,b)=>b.days-a.days);
+  const html = ads.map((ad,i) => `
+    <div class="top-item">
+      <div class="top-rank">${MEDALS[i]||'#'+(i+1)}</div>
+      ${ad.img?`<img class="top-img" src="${ad.img}" onerror="this.style.display='none'" alt="">`:'<div class="top-img" style="display:flex;align-items:center;justify-content:center;font-size:22px">🎯</div>'}
+      <div class="top-body">
+        <div class="top-brand">${ad.brand} · ${ad.format} · ${ad.live?'<span style="color:#4ade80">● Live</span>':'Terminée'}</div>
+        <div class="top-hook">${(ad.hook||'').replace(/\n/g,' ').substring(0,150)}</div>
+        <div class="top-meta">
+          <span class="ad-fmt">${ad.format}</span>
+          <span class="ad-days">⏱ ${ad.days}j</span>
+          <a href="${ad.url}" target="_blank" style="font-size:11px;color:var(--c-accent)">Voir sur Foreplay →</a>
+        </div>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="insight-box"><h3>Comment lire ce classement</h3><p>Une pub qui dure = une pub qui convertit. Ce sont vos références prioritaires à analyser et à s'inspirer.</p></div>
+    <div class="section-head"><h2>Top pubs — classées par durée d'activité</h2></div>
+    <div class="top-list">${html}</div>`;
+}
+
+// ── TENDANCES ────────────────────────────────────────────────────────
+function renderTendances(D) {
+  const html = (D.trends||[]).map((t,i) => `
+    <div class="trend-card">
+      <div class="trend-icon">${t.icon||'📌'}</div>
+      <div style="flex:1">
+        <div class="trend-title"><span style="color:var(--c-accent);font-size:18px;font-weight:800;margin-right:4px">${i+1}.</span>${t.title}</div>
+        <div class="trend-desc">${t.desc}</div>
+        <div class="trend-evidence">📎 ${t.evidence||''}</div>
+      </div>
+    </div>`).join('');
+  const reco = D.recommendation;
+  const recoHtml = reco ? `
+    <div class="reco-box">
+      <div class="reco-title">💡 Action recommandée pour ATM Gaming (priorité ${reco.priority||'Haute'})</div>
+      <div class="reco-content"><strong>${reco.product}</strong> · Format : <strong>${reco.format}</strong><br>
+      Hook suggéré : <em>"${reco.hook}"</em><br>Inspiré de : ${reco.inspiration}</div>
+    </div>` : '';
+  return `
+    <div class="section-head"><h2>Tendances de la semaine</h2><span class="section-count">${(D.trends||[]).length} tendances</span></div>
+    <div class="trends-list">${html}${recoHtml}</div>`;
+}
+
+// ── TESTS CRÉATIFS ────────────────────────────────────────────────────
+function renderTests(D) {
+  const tests = D.creativeTests || [];
+  const html = tests.map(t => `
+    <div class="trend-card" style="border-left:3px solid var(--c-accent)">
+      <div class="trend-icon" style="color:var(--c-accent)">🧪</div>
+      <div style="flex:1">
+        <div class="trend-title">${t.title} <span class="ab-badge">A/B · ${t.count} créas</span></div>
+        <div class="trend-desc" style="margin-top:5px">${t.hook}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--muted)">Marque : ${t.brand}</div>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="insight-box"><h3>Pourquoi surveiller les A/B tests concurrents ?</h3><p>Quand un concurrent lance 3–7 variantes en simultané, il teste ce qui convertit. Les créas encore actives la semaine suivante = gagnantes. Vous apprenez sans dépenser.</p></div>
+    <div class="section-head"><h2>Tests créatifs détectés</h2><span class="section-count">${tests.length} tests</span></div>
+    <div class="trends-list">${html}</div>`;
+}
+
+// ── ATM PERFS ──────────────────────────────────────────────────────────
+function renderATM() {
+  const atm = ANALYSIS.atm || {};
+  const mc = document.getElementById('mainContent');
+  mc.style.setProperty('--c-accent', '#f59e0b');
+  const brandsHtml = (atm.brands||[]).map(b => `
+    <div class="brand-card">
+      <div style="flex:1">
+        <div class="brand-name">${b.name}</div>
+        <div class="brand-meta">${b.market||''}</div>
+        <div class="brand-meta">${b.adsCount||0} pubs · ${b.liveCount||0} live · ${b.formats||''}</div>
+        <div class="brand-meta" style="margin-top:2px">${b.topAngle||''}</div>
+        <div class="brand-tags">${(b.tags||[]).map(t=>`<span class="tag ${t}">${t==='live'?'● Live':'✨ Nouveau'}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+  const topHtml = (atm.topAds||[]).map(ad => adCard(ad, '#f59e0b')).join('');
+  const insightsHtml = (atm.insights||[]).map(ins => `
+    <div class="trend-card">
+      <div class="trend-icon">${ins.icon||'💡'}</div>
+      <div style="flex:1">
+        <div class="trend-title">${ins.title}</div>
+        <div class="trend-desc">${ins.desc}</div>
+        <div class="trend-evidence">📎 ${ins.evidence||''}</div>
+      </div>
+    </div>`).join('');
+
+  const hasMetaData = atm.spend != null && atm.spend > 0;
+  const bannerHtml = hasMetaData
+    ? `<div class="demo-banner" style="border-left-color:#10b981;background:rgba(16,185,129,.08)"><span class="demo-badge" style="background:#10b981">META ADS LIVE</span><div class="demo-text">Données Meta Ads réelles — semaine du ${ANALYSIS.weekLabel}.</div></div>`
+    : `<div class="demo-banner"><span class="demo-badge">FOREPLAY DATA</span><div class="demo-text">Données Foreplay Spyder. Ajoutez META_ACCESS_TOKEN et META_AD_ACCOUNT_ID comme secrets GitHub pour le CPA/ROAS réel.</div></div>`;
+
+  const campaignsHtml = (atm.topCampaigns||[]).length > 0 ? `
+    <div class="section-head" style="margin-top:20px"><h2>🎯 Top campagnes Meta cette semaine</h2></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${(atm.topCampaigns||[]).map(c => `
+        <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="font-weight:600;color:#e2e8f0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.name}</div>
+          <div style="display:flex;gap:16px;flex-shrink:0;font-size:13px">
+            <span style="color:#f59e0b;font-weight:700">${c.spend?.toFixed(0)}€</span>
+            ${c.roas ? `<span style="color:#10b981">ROAS ${c.roas?.toFixed(1)}x</span>` : ''}
+            ${c.cpa ? `<span style="color:#60a5fa">CPA ${c.cpa?.toFixed(0)}€</span>` : ''}
+            ${c.purchases ? `<span style="color:#a78bfa">${c.purchases} achats</span>` : ''}
+          </div>
+          <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:${c.status==='ACTIVE'?'rgba(16,185,129,.2)':'rgba(107,114,128,.2)'};color:${c.status==='ACTIVE'?'#10b981':'#9ca3af'}">${c.status==='ACTIVE'?'Live':'Pausée'}</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  mc.innerHTML = `
+    ${bannerHtml}
+    <div class="section-head"><h2>📊 Mes Performances ATM Gaming — ${ANALYSIS.weekLabel}</h2></div>
+    <div class="atm-kpis">
+      <div class="atm-kpi"><div class="atm-kpi-val">${atm.totalAds||0}</div><div class="atm-kpi-label">Pubs actives total</div><div class="atm-kpi-note">${(atm.brands||[]).map(b=>b.name.split(' ')[0]+' '+b.adsCount).join(' · ')}</div></div>
+      <div class="atm-kpi"><div class="atm-kpi-val">${atm.liveAds||0}</div><div class="atm-kpi-label">Pubs live en ce moment</div><div class="atm-kpi-note">${Math.round(((atm.liveAds||0)/(atm.totalAds||1))*100)}% du parc actif</div></div>
+      ${hasMetaData ? `
+        <div class="atm-kpi" style="border-top-color:#f59e0b"><div class="atm-kpi-val" style="color:#f59e0b">${atm.spend?.toFixed(0)}€</div><div class="atm-kpi-label">Budget dépensé</div><div class="atm-kpi-note">7 derniers jours</div></div>
+        <div class="atm-kpi" style="border-top-color:#10b981"><div class="atm-kpi-val" style="color:#10b981">${atm.roas?.toFixed(1) || '—'}x</div><div class="atm-kpi-label">ROAS</div><div class="atm-kpi-note">Retour sur dépenses</div></div>
+        <div class="atm-kpi" style="border-top-color:#60a5fa"><div class="atm-kpi-val" style="color:#60a5fa">${atm.cpa?.toFixed(0) || '—'}€</div><div class="atm-kpi-label">CPA moyen</div><div class="atm-kpi-note">${atm.purchases||0} achats</div></div>
+        <div class="atm-kpi" style="border-top-color:#a78bfa"><div class="atm-kpi-val" style="color:#a78bfa">${atm.ctr?.toFixed(1)||'—'}%</div><div class="atm-kpi-label">CTR moyen</div><div class="atm-kpi-note">${((atm.impressions||0)/1000).toFixed(0)}k impressions</div></div>
+      ` : `
+        <div class="atm-kpi"><div class="atm-kpi-val">${(atm.brands||[]).length}</div><div class="atm-kpi-label">Marques en campagne</div><div class="atm-kpi-note">suivi hebdomadaire</div></div>
+        <div class="atm-kpi" style="border-top-color:#6b7280"><div class="atm-kpi-val" style="color:#6b7280">—</div><div class="atm-kpi-label">CPA / ROAS</div><div class="atm-kpi-note">Ajouter META_ACCESS_TOKEN</div></div>
+      `}
+    </div>
+    <div class="section-head"><h2>Mes marques actives</h2></div>
+    <div class="brands-grid">${brandsHtml}</div>
+    ${campaignsHtml}
+    <div class="section-head" style="margin-top:20px"><h2>Meilleures pubs ATM Gaming</h2></div>
+    <div class="ads-grid">${topHtml}</div>
+    <div class="section-head" style="margin-top:20px"><h2>Insights stratégiques</h2></div>
+    <div class="trends-list">${insightsHtml}</div>`;
+}
+
+// ── AD CARD ────────────────────────────────────────────────────────────
+function adCard(ad, forceAccent) {
+  const acc = forceAccent || getAccent();
+  const url = ad.url || ('https://app.foreplay.co/discovery?ad='+ad.id);
+  const media = ad.img
+    ? (ad.format==='VIDEO'
+       ? `<div class="ad-thumb"><img src="${ad.img}" onerror="this.parentNode.innerHTML='<span style=\"font-size:28px\">🎬</span>'"><div class="vplay"><div class="vplay-icon">▶</div></div></div>`
+       : `<div class="ad-thumb"><img src="${ad.img}" onerror="this.parentNode.innerHTML='<span style=\"font-size:28px\">🖼️</span>'"></div>`)
+    : `<div class="ad-thumb" style="font-size:28px">${ad.format==='VIDEO'?'🎬':'🖼️'}</div>`;
+  return `
+    <div class="ad-card" onclick="window.open('${url}','_blank')" style="--c-accent:${acc}">
+      ${media}
+      <div class="ad-body">
+        <div class="ad-brand">${ad.brand||''}</div>
+        <div class="ad-desc">${(ad.hook||'').replace(/\n/g,' ')}</div>
+        <div class="ad-footer">
+          <span class="ad-fmt">${ad.format||''}</span>
+          <span class="ad-days">⏱ ${ad.days||0}j</span>
+          ${ad.live?'<div class="ad-live"></div>':''}
+        </div>
+        <a class="ad-link" href="${url}" target="_blank" onclick="event.stopPropagation()">Voir sur Foreplay →</a>
+      </div>
+    </div>`;
+}
+
+// ── INIT ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.ctab').forEach(t => {
+  t.addEventListener('click', () => {
+    t.style.setProperty('--c-accent', C_META[t.dataset.country]?.accent || '#3b82f6');
+  });
+});
+document.getElementById('mainContent').style.setProperty('--c-accent', '#8b5cf6');
+render();
+</script>
+</body>
+</html>
